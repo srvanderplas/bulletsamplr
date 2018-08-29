@@ -1,0 +1,25 @@
+Package: bulletsamplr
+Type: Package
+Title: Resample bullet signatures 
+Version: 0.1.0
+Authors@R: c(
+  person("Susan", "Vanderplas", email = "srvander@iastate.edu", 
+         role = c("aut", "cre")),
+  person("Heike", "Hofmann", email = "hofmann@iastate.edu", role = c("aut"))
+  )
+Maintainer: Susan Vanderplas <srvander@iastate.edu>
+Description: Resamples land signatures from NIST's NRBTD or from provided data, 
+    with the goal of examining the distribution of match scores from randomly
+    generated distributions
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Suggests: 
+    testthat,
+    roxygen2
+Depends:
+    bulletxtrctr,
+    x3ptools,
+    dplyr,
+    assertthat
+RoxygenNote: 6.0.1
