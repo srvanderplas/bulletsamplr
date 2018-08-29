@@ -10,17 +10,22 @@ Authors@R: c(
 Maintainer: Susan Vanderplas <srvander@iastate.edu>
 Description: Resamples land signatures from NIST's NRBTD or from provided data, 
     with the goal of examining the distribution of match scores from randomly
-    generated distributions
+    generated distributions.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Suggests: 
     testthat,
     roxygen2,
+    x3ptools,
     covr
 Depends:
+    R (>= 2.10),
     bulletxtrctr,
-    x3ptools,
     dplyr,
     assertthat
+Remotes: 
+    heike/bulletxtrctr,
+    heike/x3ptools,
+    klutometis/roxygen
 RoxygenNote: 6.0.1

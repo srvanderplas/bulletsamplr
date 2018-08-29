@@ -8,8 +8,11 @@
 #'          return to the default value.
 #' @param ... additional parameters passed to bulletxtrctr::sig_get_peaks
 #' @return a list of vectors with signature cycles
-#' @importFrom assertthat assert_that
+#' @importFrom assertthat assert_that has_name
+#' @importFrom dplyr '%>%'
 #' @importFrom bulletxtrctr sig_get_peaks
+#' @examples
+#' data("sig")
 crosscut_slice <- function(x, cycle_type = 'full', ...) {
   if (!is.numeric(x)) {
     assert_that(has_name(x, "sig"),
@@ -29,5 +32,5 @@ crosscut_slice <- function(x, cycle_type = 'full', ...) {
 
   # Get residual structure in one object, peak height in another; then combine
   peaks <- bulletxtrctr::sig_get_peaks(sig, ...)
-  med_val <- median(sig)
+  med_val <- stats::median(sig)
 }
