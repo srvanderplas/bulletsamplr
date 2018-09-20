@@ -11,26 +11,69 @@
 #' @importFrom assertthat assert_that has_name
 #' @importFrom dplyr '%>%'
 #' @importFrom bulletxtrctr sig_get_peaks
+#' @export
 #' @examples
 #' data("sig")
 crosscut_slice <- function(x, cycle_type = 'full', ...) {
   if (!is.numeric(x)) {
-    assert_that(has_name(x, "sig"),
-                msg = paste0("sig must either be numeric or a list or ",
-                             "data.frame containing a column named 'sig'"))
+    assertthat::assert_that(
+      assertthat::has_name(x, "sig"),
+      msg = paste0("sig must either be numeric or a list or ",
+                   "data.frame containing a column named 'sig'"))
     sig <- x$sig
   } else {
     sig <- x
   }
 
-  assert_that(cycle_type %in% c("half", "full"),
-              msg = "cycle_type must be one of 'half' or 'full'")
-  assert_that(is.numeric(sig))
-
-  # Need to figure out how to deal with small peaks and hugely lopsided peaks
-  # that may not reach the critical value before the next extrema.
+  assertthat::assert_that(
+    cycle_type %in% c("half", "full"),
+    msg = "cycle_type must be one of 'half' or 'full'")
+  assertthat::assert_that(is.numeric(sig))
 
   # Get residual structure in one object, peak height in another; then combine
-  peaks <- bulletxtrctr::sig_get_peaks(sig, ...)
-  med_val <- stats::median(sig)
+  # peaks <- bulletxtrctr::sig_get_peaks(sig, ...)
+  med_val <- stats::median(sig, na.rm = T)
+
+  # Convert to std scale - median
+  sigmed <- sig - med_val
+  signs <- sign(sigmed)
+  neg <- which(signs == -1)
+  pos <- which(signs == 1)
+  n2p <- intersect(neg + 1, pos) # get neg-to-pos transition
+  p2n <- intersect(pos + 1, neg) # get pos-to-neg transition
+
+  # Index
+  cycle_type <- ifelse(n2p[1] > p2n[1], "pn", "np")
+  idx <- if (cycle_type == "pn") {
+    n2p
+  } else {
+    p2n
+  }
+
+  sig_idx <- data_frame(
+    chunk = 0:length(idx),
+    start = c(1, idx),
+    end = c(idx - 1, length(sig)),
+    type = c("start", rep(cycle_type, length(idx) - 1), "end")
+  )
+
+  chunks <- purrr::pmap(sig_idx, function(chunk, start, end, type) {
+    z <- if (is.data.frame(x)) {
+      x[start:end,]
+    } else {
+      data_frame(
+        sig = sigmed[start:end]
+      )
+    }
+
+    z %>%
+      mutate(
+        chunk = chunk,
+        type = type
+      ) %>%
+      mutate(sig = ifelse(type == "np", -sig, sig),
+             type = ifelse(type == "np", "pn", type))
+  })
+
+  chunks
 }
