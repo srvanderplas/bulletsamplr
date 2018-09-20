@@ -19,8 +19,7 @@ Suggests:
     roxygen2,
     x3ptools,
     covr
-Depends:
-    R (>= 2.10),
+Imports:
     bulletxtrctr,
     dplyr,
     assertthat
@@ -28,4 +27,4 @@ Remotes:
     heike/bulletxtrctr,
     heike/x3ptools,
     klutometis/roxygen
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.0
