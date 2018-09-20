@@ -62,17 +62,26 @@ crosscut_slice <- function(x, cycle_type = 'full', ...) {
       x[start:end,]
     } else {
       data_frame(
-        sig = sigmed[start:end]
+        x = start:end,
+        sig = sig[start:end]
       )
+    }
+
+    if (type == "end") {
+      z$x <- -z$x
+      z$sig <- rev(z$sig)
+      z <- arrange(z, x)
     }
 
     z %>%
       mutate(
+        sig = sig - med_val,
         chunk = chunk,
         type = type
       ) %>%
       mutate(sig = ifelse(type == "np", -sig, sig),
-             type = ifelse(type == "np", "pn", type))
+             type = ifelse(type == "np", "pn", type),
+             type = ifelse(type == "pn", "pn", "boundary"))
   })
 
   chunks
