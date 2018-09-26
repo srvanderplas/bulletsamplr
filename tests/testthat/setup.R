@@ -4,6 +4,7 @@ library(odbc)
 library(RSQLite)
 library(dplyr)
 library(purrr)
+library(tidyr)
 
 # Generate test slices
 set.seed(40920793)
@@ -20,7 +21,7 @@ test_slice_table <- bind_rows(
              sig = asin(sin(2*x)), len = length(x))
 )
 
-split_idx <- purrr::map_df(
+split_idx <- map_df(
   unique(test_slice_table$id),
   function(.) {
     start_idx <- floor(sum(test_slice_table$id == .)/2)
@@ -31,9 +32,9 @@ split_idx <- purrr::map_df(
 
 test_slice_table <- test_slice_table %>%
   left_join(split_idx, by = "id") %>%
-  tidyr::nest(-split_idx) %>%
-  dplyr::mutate(
-    tab = purrr::map2(split_idx, data, function(idx, data) {
+  nest(-split_idx) %>%
+  mutate(
+    tab = map2(split_idx, data, function(idx, data) {
       if (unique(data$type) ==  "pn") {
         bind_rows(
           data,
@@ -47,4 +48,4 @@ test_slice_table <- test_slice_table %>%
     })
   ) %>%
   select(-split_idx, -data) %>%
-  tidyr::unnest()
+  unnest()
