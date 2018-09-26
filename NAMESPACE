@@ -2,7 +2,8 @@
 
 export(crosscut_assemble)
 export(crosscut_slice)
+import(dplyr)
 importFrom(assertthat,assert_that)
 importFrom(assertthat,has_name)
 importFrom(bulletxtrctr,sig_get_peaks)
-importFrom(dplyr,'%>%')
+importFrom(purrr,pmap)

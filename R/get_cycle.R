@@ -9,7 +9,8 @@
 #' @param ... additional parameters passed to bulletxtrctr::sig_get_peaks
 #' @return a list of vectors with signature cycles
 #' @importFrom assertthat assert_that has_name
-#' @importFrom dplyr '%>%'
+#' @import dplyr
+#' @importFrom purrr pmap
 #' @importFrom bulletxtrctr sig_get_peaks
 #' @export
 #' @examples
