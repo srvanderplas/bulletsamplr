@@ -177,7 +177,8 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   cycles_df <- dplyr::filter(df, id %in% cycles$id) %>% dplyr::collect() %>%
     dplyr::left_join(dplyr::select(cycles, id, .idx), by = "id") %>%
     dplyr::arrange(.idx, x) %>%
-    dplyr::select(-.idx)
+    dplyr::select(-.idx) %>%
+    mutate(sig = sig*init_sign)
 
   end_df <- dplyr::filter(df, id == end_chunk$id) %>% dplyr::collect() %>%
     dplyr::mutate(.idx = 1:dplyr::n()) %>%
