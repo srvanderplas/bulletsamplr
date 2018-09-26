@@ -4,6 +4,7 @@ library(odbc)
 library(dplyr)
 library(RSQLite)
 
+# Generate test slices
 set.seed(40920793)
 test_slice_table <- data_frame(id = "sin", type = "pn",
                                x = seq(0, 2*pi, by = .005), sig = sin(x))
@@ -16,13 +17,17 @@ test_slice_table <- bind_rows(
     mutate(id = "sin_end", type = "boundary")
 )
 
-# If bigfoot, use sql connection
-if (system('hostname', intern = T) == 'bigfoot') {
-  db_con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
-} else {
-  if ("RSQLite" %in% installed.packages) {
-    db_con <- dbConnect(RSQLite::SQLite(), ":memory:")
+skip_sql_tests <- FALSE
+bigfoot <- system('hostname', intern = T) == 'bigfoot'
 
-    dbWriteTable(db_con, "bullet.slice", test_slice_table)
-  }
+# If bigfoot, use sql connection
+if (bigfoot) {
+  bigfoot_db_con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
+}
+
+if ("RSQLite" %in% installed.packages) {
+  db_con <- dbConnect(RSQLite::SQLite(), ":memory:")
+  dbWriteTable(db_con, "bullet.slice", test_slice_table)
+} else {
+  skip_sql_tests <- TRUE
 }

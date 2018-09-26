@@ -1,4 +1,8 @@
 # If bigfoot, close sql connection
-if (system('hostname', intern = T) == 'bigfoot') {
-  odbc::dbDisconnect(db_con)
+if (!skip_sql_tests) {
+  dbDisconnect(db_con)
+}
+
+if (bigfoot) {
+  dbDisconnect(bigfoot_db_con)
 }
