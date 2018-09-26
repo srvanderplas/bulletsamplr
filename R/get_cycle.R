@@ -15,6 +15,8 @@
 #' @export
 #' @examples
 #' data("sig")
+#' crosscut_slice(sig) # Slice whole data frame
+#' crosscut_slice(sig$sig) # Slice signature only
 crosscut_slice <- function(x, cycle_type = 'full', ...) {
   if (!is.numeric(x)) {
     assertthat::assert_that(
