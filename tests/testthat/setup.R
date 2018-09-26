@@ -1,33 +1,50 @@
 # Set up test environment
 library(DBI)
 library(odbc)
-library(dplyr)
 library(RSQLite)
+library(dplyr)
+library(purrr)
 
 # Generate test slices
 set.seed(40920793)
-test_slice_table <- data_frame(id = "sin", type = "pn",
-                               x = seq(0, 2*pi, by = .005), sig = sin(x))
-split_idx <- sample(floor(nrow(test_slice_table)/2):nrow(test_slice_table), 1)
 test_slice_table <- bind_rows(
-  test_slice_table,
-  test_slice_table[1:split_idx,] %>%
-    mutate(id = "sin_start", type = "boundary"),
-  test_slice_table[(split_idx + 1):nrow(test_slice_table),] %>%
-    mutate(id = "sin_end", type = "boundary")
+  data_frame(id = "cos", type = "boundary", x = seq(0, 1.5*pi, by = .01),
+             sig = cos(x), len = length(x)),
+  data_frame(id = "sin", type = "pn", x = seq(0, 2*pi, by = .01),
+             sig = sin(x), len = length(x)),
+  data_frame(id = "sin2", type = "pn", x = seq(0, pi, by = .01),
+             sig = sin(2*x), len = length(x)),
+  data_frame(id = "sharp", type = "pn", x = seq(0, 2*pi, by = .01),
+             sig = asin(sin(x)), len = length(x)),
+  data_frame(id = "sharp2", type = "pn", x = seq(0, pi, by = .01),
+             sig = asin(sin(2*x)), len = length(x))
 )
 
-sql_tests <- FALSE
-bigfoot <- system('hostname', intern = T) == 'bigfoot'
+split_idx <- purrr::map_df(
+  unique(test_slice_table$id),
+  function(.) {
+    start_idx <- floor(sum(test_slice_table$id == .)/2)
+    end_idx <- sum(test_slice_table$id == .)
+    zzz <- sample(start_idx:end_idx, 1)
+    data_frame(split_idx = zzz, id = .)
+  })
 
-# If bigfoot, use sql connection
-if (bigfoot) {
-  bigfoot_db_con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
-}
-
-if ("RSQLite" %in% installed.packages) {
-  db_con <- dbConnect(RSQLite::SQLite(), ":memory:")
-  dbWriteTable(db_con, "bullet.slice", test_slice_table)
-} else {
-  sql_tests <- TRUE
-}
+test_slice_table <- test_slice_table %>%
+  left_join(split_idx, by = "id") %>%
+  tidyr::nest(-split_idx) %>%
+  dplyr::mutate(
+    tab = purrr::map2(split_idx, data, function(idx, data) {
+      if (unique(data$type) ==  "pn") {
+        bind_rows(
+          data,
+          data[1:idx,] %>% mutate(id = paste0(id, "_start"), type = "boundary"),
+          data[rev((idx + 1):nrow(data)),] %>%
+            mutate(id = paste0(id, "_end"), type = "boundary")
+        )
+      } else {
+        data
+      }
+    })
+  ) %>%
+  select(-split_idx, -data) %>%
+  tidyr::unnest()

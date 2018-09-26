@@ -103,20 +103,27 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
     slice_df_check(df)
     df_summary <- df %>% group_by(id, type) %>%
       summarize(n = n(),
-                not_na = sum(!is.na(sig)))
+                not_na = sum(!is.na(sig))) %>%
+      ungroup()
+
     slice_sum_df_check(df_summary)
   } else if (length(tab) == 2) {
     assertthat::assert_that(is.character(tab))
     df <- dplyr::tbl(con, tab[1])
     slice_df_check(df)
-    df_summary <- tbl(con, tab[2]) %>% collect()
+    df_summary <- dplyr::tbl(con, tab[2]) %>%
+      dplyr::collect()
     slice_sum_df_check(df_summary)
   } else if (length(tab) == 1) {
     assertthat::assert_that(is.character(tab))
-    df <- tbl(con, tab[1])
+    df <- dplyr::tbl(con, tab)
     slice_df_check(df)
-    df_summary <- df %>% group_by(id, type) %>%
-      summarize(n = n(), not_na = sum(!is.na(sig))) %>% collect()
+    df_summary <- df %>%
+      group_by(id, type) %>%
+      collect() %>%
+      summarize(n = n(),
+                not_na = sum(!is.na(sig))) %>%
+      ungroup()
     slice_sum_df_check(df_summary)
   } else {
     stop("tab must be either a data frame or a character vector containing the table name(s)")
@@ -132,7 +139,10 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   end_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
     dplyr::filter(row_number() == sample(1:dplyr::n(), 1))
 
-  na_max_len <- (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na)
+  na_max_len <- pmax(
+    (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na),
+    min(df_summary$n[df_summary$type != 'boundary'])
+  )
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
   # Get empty cycles data frame with columns as in df_summary
@@ -146,6 +156,10 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
       dplyr::filter(n < remaining_len) %>%
       dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1)) %>%
       mutate(.idx = iterations)
+
+    if (nrow(new_cycle) == 0) {
+      break
+    }
 
     cycles <- dplyr::bind_rows(cycles, new_cycle)
 
