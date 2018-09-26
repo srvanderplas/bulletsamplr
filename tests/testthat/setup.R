@@ -17,7 +17,7 @@ test_slice_table <- bind_rows(
     mutate(id = "sin_end", type = "boundary")
 )
 
-skip_sql_tests <- FALSE
+sql_tests <- FALSE
 bigfoot <- system('hostname', intern = T) == 'bigfoot'
 
 # If bigfoot, use sql connection
@@ -29,5 +29,5 @@ if ("RSQLite" %in% installed.packages) {
   db_con <- dbConnect(RSQLite::SQLite(), ":memory:")
   dbWriteTable(db_con, "bullet.slice", test_slice_table)
 } else {
-  skip_sql_tests <- TRUE
+  sql_tests <- TRUE
 }
