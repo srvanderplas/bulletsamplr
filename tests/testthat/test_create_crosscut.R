@@ -1,23 +1,17 @@
 context("create_crosscut")
 
-setup({
-  sql_tests <- FALSE
-  if ("RSQLite" %in% installed.packages()) {
-    db_con <- dbConnect(RSQLite::SQLite(), ":memory:")
-    test_slice_summary <- test_slice_table %>%
-      group_by(id, type) %>%
-      summarize(n = n(),
-                not_na = sum(!is.na(sig))) %>%
-      ungroup()
-    dbWriteTable(db_con, "bullet.slice", test_slice_table)
-    dbWriteTable(db_con, "bullet.slice.idx", test_slice_summary)
-    sql_tests <- TRUE
-  }
-})
-
-teardown({
-  dbDisconnect(db_con)
-})
+sql_tests <- FALSE
+if ("RSQLite" %in% installed.packages()) {
+  db_con <- dbConnect(RSQLite::SQLite(), ":memory:")
+  test_slice_summary <- test_slice_table %>%
+    group_by(id, type) %>%
+    summarize(n = n(),
+              not_na = sum(!is.na(sig))) %>%
+    ungroup()
+  dbWriteTable(db_con, "bullet.slice", test_slice_table)
+  dbWriteTable(db_con, "bullet.slice.idx", test_slice_summary)
+  sql_tests <- TRUE
+}
 
 test_that("crosscut_assemble works as expected", {
 
@@ -34,4 +28,6 @@ test_that("crosscut_assemble works as expected", {
     tmp3 <- crosscut_assemble(1000, con = db_con)
     expect_equivalent(tmp, tmp3)
   }
+
+  dbDisconnect(db_con)
 })
