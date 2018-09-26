@@ -16,17 +16,58 @@ slice_df_check <- function(df) {
 slice_sum_df_check <- function(df) {
   if (is.data.frame(df)) {
     assertthat::assert_that(
-      assertthat::has_name(df_summary, "id"),
-      assertthat::has_name(df_summary, "type"),
-      assertthat::has_name(df_summary, "n"),
-      assertthat::has_name(df_summary, "not_na"))
+      assertthat::has_name(df, "id"),
+      assertthat::has_name(df, "type"),
+      assertthat::has_name(df, "n"),
+      assertthat::has_name(df, "not_na"))
   }
 
   if ("tbl_sql" %in% class(df) | "tbl_lazy" %in% class(df)) {
-    assertthat::assert_that("id" %in% df_summary$ops$vars,
-                            "type" %in% df_summary$ops$vars,
-                            "n" %in% df_summary$ops$vars,
-                            "not_na" %in% df_summary$ops$vars)
+    assertthat::assert_that("id" %in% df$ops$vars,
+                            "type" %in% df$ops$vars,
+                            "n" %in% df$ops$vars,
+                            "not_na" %in% df$ops$vars)
+  }
+}
+
+#' Pad or trim the data frame to the specified number of rows
+#'
+#' @param full_df full data frame to pad/trim to the correct length
+#' @param len desired length of the data frame
+#' @return a data frame with len rows
+#' @import dplyr
+#' @importFrom assertthat assert_that has_name
+df_fix_length <- function(full_df, len) {
+  assertthat::assert_that(
+    assertthat::has_name(full_df, "id"),
+    assertthat::has_name(full_df, "type"),
+    assertthat::has_name(full_df, "x"),
+    assertthat::has_name(full_df, "y"),
+    assertthat::has_name(full_df, "value"),
+    assertthat::has_name(full_df, "sig")
+  )
+  assertthat::assert_that(is.numeric(len), len %% 1 == 0)
+
+  if (nrow(full_df) == len) {
+    return(full_df)
+  } else if (nrow(full_df) > len) {
+    trim_front <- sample(1:(nrow(full_df) - len), 1)
+    trim_back <- trim_front + len - 1
+    return(
+      dplyr::filter(full_df, dplyr::row_number() >= trim_front,
+                    dplyr::row_number() <= trim_back)
+    )
+  } else {
+    # full_df is too short
+    padna <- len - nrow(full_df)
+    pad_front <- sample(1:padna, 1)
+    pad_back <- padna - pad_front
+    blank_row <- dplyr::data_frame(id = NA, type = "boundary", x = NA, y = NA,
+                                   value = NA, sig = NA)
+    return(
+      dplyr::bind_rows(lapply(1:pad_front, function(i) blank_row),
+                       full_df, lapply(1:pad_back, function(i) blank_row))
+    )
   }
 }
 
@@ -57,7 +98,7 @@ slice_sum_df_check <- function(df) {
 #' @import dplyr
 crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
                               con = NULL) {
-  type <- sig <- x <- df_summary <- NULL
+  type <- sig <- x <- df_summary <- .idx <- NULL
 
   if (is.null(con)) {
     assertthat::assert_that(is.data.frame(tab))
@@ -88,29 +129,29 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   stopifnot(exists("df_summary"))
 
   # Choose a starting chunk
-  start_chunk <- filter(df_summary, type == "boundary") %>%
-    filter(row_number() == sample(1:n(), 1))
+  start_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
+    dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1))
 
   # Choose an ending chunk
-  end_chunk <- filter(df_summary, type == "boundary") %>%
-    filter(row_number() == sample(1:n(), 1))
+  end_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
+    dplyr::filter(row_number() == sample(1:dplyr::n(), 1))
 
   na_max_len <- (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na)
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
   # Get empty cycles data frame with columns as in df_summary
-  cycles <- filter(df_summary, 0 == 1) %>%
-    mutate(.idx = as.numeric(id))
+  cycles <- dplyr::filter(df_summary, 0 == 1) %>%
+    dplyr::mutate(.idx = as.numeric(id))
   iterations <- 0
 
   while (remaining_len > na_max_len & iterations < 500) {
     iterations <- iterations + 1
-    new_cycle <- filter(df_summary, type != "boundary") %>%
-      filter(n < remaining_len) %>%
-      filter(row_number() == sample(1:n(), 1)) %>%
+    new_cycle <- dplyr::filter(df_summary, type != "boundary") %>%
+      dplyr::filter(n < remaining_len) %>%
+      dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1)) %>%
       mutate(.idx = iterations)
 
-    cycles <- bind_rows(cycles, new_cycle)
+    cycles <- dplyr::bind_rows(cycles, new_cycle)
 
     remaining_len <- remaining_len - new_cycle$n
   }
@@ -118,45 +159,25 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   # Choose initial sign
   init_sign <- sample(c(-1, 1), 1)
 
-  start_df <- filter(df, id == start_chunk$id) %>% collect()
+  start_df <- dplyr::filter(df, id == start_chunk$id) %>% dplyr::collect()
   if (sign(start_df$sig[!is.na(start_df$sig)][1]) != init_sign) {
     start_df$sig <- start_df$sig * -1
   }
 
-  cycles_df <- filter(df, id %in% cycles$id) %>% collect() %>%
-    left_join(select(cycles, id, .idx)) %>%
-    arrange(.idx, x) %>%
-    select(-.idx)
+  cycles_df <- dplyr::filter(df, id %in% cycles$id) %>% dplyr::collect() %>%
+    dplyr::left_join(dplyr::select(cycles, id, .idx)) %>%
+    dplyr::arrange(.idx, x) %>%
+    dplyr::select(-.idx)
 
-  end_df <- filter(df, id == end_chunk$id) %>% collect() %>%
-    mutate(.idx = 1:n()) %>%
-    arrange(desc(.idx)) %>%
-    select(-.idx)
+  end_df <- dplyr::filter(df, id == end_chunk$id) %>% dplyr::collect() %>%
+    dplyr::mutate(.idx = 1:dplyr::n()) %>%
+    dplyr::arrange(dplyr::desc(.idx)) %>%
+    dplyr::select(-.idx)
   if (sign(end_df$sig[!is.na(end_df$sig)][1]) < 0) {
     end_df$sig <- end_df$sig * -1
   }
 
-  full_df <- bind_rows(start_df, cycles_df, end_df)
+  full_df <- dplyr::bind_rows(start_df, cycles_df, end_df)
 
-  if (nrow(full_df) == len) {
-    return(full_df)
-  } else if (nrow(full_df) > len) {
-    trim_front <- sample(1:(nrow(full_df) - len), 1)
-    trim_back <- trim_front + len - 1
-    return(
-      filter(full_df, dplyr::row_number() >= trim_front,
-                       dplyr::row_number() <= trim_back)
-    )
-  } else {
-    # full_df is too short
-    padna <- len - nrow(full_df)
-    pad_front <- sample(1:padna, 1)
-    pad_back <- padna - pad_front
-    blank_row <- data_frame(id = NA, type = "boundary", x = NA, y = NA, value = NA, sig = NA)
-    return(
-      bind_rows(lapply(1:pad_front, function(i) blank_row),
-                full_df, lapply(1:pad_back, function(i) blank_row))
-    )
-  }
-
+  df_fix_length(full_df, len)
 }

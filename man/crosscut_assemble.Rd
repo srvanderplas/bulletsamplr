@@ -12,16 +12,23 @@ crosscut_assemble(len, tab = c("bullet.slice", "bullet.slice.idx"),
 
 \item{tab}{if a db connection is passed in, this should be a character vector
 of length two, giving the name of the full table and the summary table.
-The full table should have (at least) columns id, sig, and type. The
-summary table should have columns id, type, n (the length of the chunk),
-and not_na (the number of non-na pieces). The full table should have all
-sequence pieces which are to be resampled. If a scalar is supplied, the
-summary table will be generated within the function.
-If a db connection is not available, this should be a data frame with the
-relevant information.}
+The full table should have (at least) columns id, sig, and type
+(boundary or otherwise). The summary table should have columns id, type,
+n (the length of the chunk), and not_na (the number of non-na pieces).
+The full table should have all sequence pieces which are to be resampled.
+If a scalar is supplied, the summary table will be generated within the
+function. If a db connection is not available, this should be a data
+frame with the relevant information.}
 
 \item{con}{database connection}
 }
 \description{
-Assemble a "resampled" bullet sequence
+This function assembles a sequence of length `len` from a table (or database)
+of cycles created by `crosscut_slice()` in the following way:
+\enumerate{
+\item Starting and ending "chunks" are chosen
+\item The remaining cycles in the sequence are sampled from the table until the full sequence has reached an appropriate length
+\item The full data is assembled from the cycles selected in the first two steps
+\item The sequence is trimmed (if too long) or padded with NA values (if too short) until it is the correct length
+}
 }
