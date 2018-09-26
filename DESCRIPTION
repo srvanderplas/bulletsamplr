@@ -18,7 +18,8 @@ Suggests:
     testthat,
     roxygen2,
     x3ptools,
-    covr
+    covr,
+    RSQLite
 Imports:
     bulletxtrctr,
     dplyr,

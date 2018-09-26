@@ -41,9 +41,6 @@ df_fix_length <- function(full_df, len) {
   assertthat::assert_that(
     assertthat::has_name(full_df, "id"),
     assertthat::has_name(full_df, "type"),
-    assertthat::has_name(full_df, "x"),
-    assertthat::has_name(full_df, "y"),
-    assertthat::has_name(full_df, "value"),
     assertthat::has_name(full_df, "sig")
   )
   assertthat::assert_that(is.numeric(len), len %% 1 == 0)
@@ -62,8 +59,7 @@ df_fix_length <- function(full_df, len) {
     padna <- len - nrow(full_df)
     pad_front <- sample(1:padna, 1)
     pad_back <- padna - pad_front
-    blank_row <- dplyr::data_frame(id = NA, type = "boundary", x = NA, y = NA,
-                                   value = NA, sig = NA)
+    blank_row <- dplyr::data_frame(type = "fill")
     return(
       dplyr::bind_rows(lapply(1:pad_front, function(i) blank_row),
                        full_df, lapply(1:pad_back, function(i) blank_row))
@@ -165,7 +161,7 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   }
 
   cycles_df <- dplyr::filter(df, id %in% cycles$id) %>% dplyr::collect() %>%
-    dplyr::left_join(dplyr::select(cycles, id, .idx)) %>%
+    dplyr::left_join(dplyr::select(cycles, id, .idx), by = "id") %>%
     dplyr::arrange(.idx, x) %>%
     dplyr::select(-.idx)
 
