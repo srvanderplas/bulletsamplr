@@ -146,7 +146,7 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
   cycles <- dplyr::filter(df_summary, type != "boundary") %>%
-    sample_n(size = n(), replace = T) %>%
+    sample_n(size = nrow(.), replace = T) %>%
     mutate(cum_length = cumsum(n)) %>%
     filter(cum_length <= remaining_len) %>%
     mutate(.idx = 1:n())
