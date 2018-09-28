@@ -41,7 +41,7 @@ crosscut_slice <- function(x, cycle_type = 'full', ...) {
   sigmed <- sig - med_val
   signs <- sign(sigmed)
   neg <- which(signs == -1)
-  pos <- which(signs == 1)
+  pos <- which(signs == 1 | signs == 0)
   n2p <- intersect(neg + 1, pos) # get neg-to-pos transition
   p2n <- intersect(pos + 1, neg) # get pos-to-neg transition
 

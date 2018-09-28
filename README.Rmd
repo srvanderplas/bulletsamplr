@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
  [![Travis build status](https://travis-ci.org/srvanderplas/bulletsamplr.svg?branch=master)](https://travis-ci.org/srvanderplas/bulletsamplr)
   [![Coverage status](https://codecov.io/gh/srvanderplas/bulletsamplr/branch/master/graph/badge.svg)](https://codecov.io/github/srvanderplas/bulletsamplr?branch=master)
   
-The goal of bulletsamplr is to ...
+The goal of bulletsamplr is to create bullet signatures which can be used to examine the behavior of match statistics under truly random conditions.
 
 ## Installation
 
@@ -32,4 +32,34 @@ devtools::install_github("srvanderplas/bulletsamplr")
 
 ## Example
 
-This is a basic example which shows you how to solve a common problem
+The threshold bootstrap creates new sequences by resampling "cycles" from actual data. These cycles are created as follows:
+```{r, fig.cap = "Bullet Signature"}
+library(ggplot2)
+library(bulletsamplr)
+library(dplyr)
+
+data(sig)
+ggplot(aes(x = x, y = sig), data = sig) + 
+  geom_line() + 
+  ggtitle("Original Signature")
+```
+
+```{r, fig.cap = "Bullet Signature. Cycles are created when the sequence crosses the median, and include one positive region and one negative region. This ensures continuity between adjacent segments."}
+threshold <- median(sig$sig, na.rm = T)
+ggplot(aes(x = x, y = sig), data = sig) + 
+  geom_line() + 
+  geom_hline(aes(yintercept = threshold), color = "red") + 
+  ggtitle("Threshold used to create cycles for future sample signatures")
+```
+
+
+```{r, fig.cap = ""}
+sig_slices <- crosscut_slice(sig) %>% bind_rows() %>%
+  group_by(chunk) %>%
+  mutate(x = x - mean(x, na.rm = T))
+sig_slices$chunk_label <- factor(sig_slices$chunk, labels = c("boundary_start", paste("cycle", unique(sig_slices$chunk)[-c(1, max(sig_slices$chunk))]), "boundary_end"))
+
+ggplot(aes(x = x, y = sig), data = sig_slices) + 
+  facet_wrap(~chunk_label, scales = "free") + 
+  geom_line()
+```

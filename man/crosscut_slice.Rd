@@ -25,4 +25,6 @@ Slice signature into cycles
 }
 \examples{
 data("sig")
+crosscut_slice(sig) # Slice whole data frame
+crosscut_slice(sig$sig) # Slice signature only
 }
