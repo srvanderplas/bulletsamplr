@@ -19,7 +19,7 @@ peaks <- tbl(con, "bullet.peaks") %>%
   collect() %>%
   left_join(cs_lims) %>%
   mutate(xavg = (xmin + xmax)/2)
-
+dbDisconnect(con)
 
 ggplot(peaks) +
   geom_bin2d(aes(x = xavg,
@@ -29,21 +29,16 @@ ggplot(peaks) +
 
 peak_lens <- peaks %>% group_by(Study, Barrel, Bullet, Land, id) %>%
   summarize(seq_len = unique(seq_len))
-tmp <- furrr::future_map(as.numeric(peak_lens$seq_len), crosscut_assemble, con = con)
+tmp <- furrr::future_map(as.numeric(peak_lens$seq_len),
+                         crosscut_assemble, con = con)
 
-tmp <- list()
-for(i in 1:nrow(peak_lens)) {
+tmp <- rep(NA, 420) %>% as.list()
+for (i in 1:nrow(peak_lens)) {
   print(i)
-  tmp <- c(tmp, crosscut_assemble(peak_lens$seq_len[i], con = con))
+  tmp[i] <- crosscut_assemble(peak_lens$seq_len[i], con = con)
 }
 
-tmp2 <- rep(NA, 420) %>% as.list()
-for(i in 1:nrow(peak_lens)) {
-  j <- (i - 1)*6 + 1
-  tmp2[[i]] <- tmp[j:(j+5)] %>% as.data.frame()
-  tmp2[[i]]$sample <- i
-}
-resampled_sigs <- bind_rows(tmp2)
+resampled_sigs <- bind_rows(tmp)
 
 resampled_peaks <- resampled_sigs  %>%
   tidyr::nest(type, id, x, y, value, sig) %>%
@@ -53,6 +48,8 @@ resampled_peaks <- resampled_sigs  %>%
 resampled_peaks <- resampled_peaks  %>%
   mutate(xavg = (xmin + xmax)/2)
 
+saveRDS(resampled_sigs, file = "data-raw/resampled_sigs.rda")
+saveRDS(resampled_peaks, file = "data-raw/resampled_peaks.rda")
 
 ggplot(resampled_peaks) +
   geom_bin2d(aes(x = xavg,
@@ -64,11 +61,10 @@ bind_rows(
   resampled_peaks %>% select(xavg, heights) %>% mutate(type = "Resampled Data")
 ) %>%
 ggplot() +
-  stat_density_2d(aes(x = xavg, y = heights, color = type, fill = stat(density)), contour = F, geom = "raster") +
+  stat_density_2d(aes(x = xavg, y = heights, color = type, fill = stat(density)),
+                  contour = F, geom = "raster") +
   facet_wrap(~type)
 
-saveRDS(resampled_sigs, file = "data-raw/resampled_sigs.rda")
-saveRDS(resampled_peaks, file = "data-raw/resampled_peaks.rda")
-dbDisconnect(con)
+
 
 
