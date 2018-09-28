@@ -133,11 +133,11 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
 
   # Choose a starting chunk
   start_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
-    dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1))
+    dplyr::sample_n(size = 1)
 
   # Choose an ending chunk
   end_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
-    dplyr::filter(row_number() == sample(1:dplyr::n(), 1))
+    dplyr::sample_n(size = 1)
 
   na_max_len <- pmax(
     (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na),
@@ -145,54 +145,27 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   )
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
-  # Get empty cycles data frame with columns as in df_summary
-  # cycles <- dplyr::filter(df_summary, 0 == 1) %>%
-  #   dplyr::mutate(.idx = as.numeric(id))
-  # iterations <- 0
-
-  # Need a faster way to do this...
-  cycles <- dplyr::filter(df_summary, type != "boundary")
-
-  cycle_order <- sample(1:nrow(cycles))
-  cycles <- cycles[cycle_order,] %>%
+  cycles <- dplyr::filter(df_summary, type != "boundary") %>%
+    sample_n(size = n(), replace = T) %>%
     mutate(cum_length = cumsum(n)) %>%
     filter(cum_length <= remaining_len) %>%
     mutate(.idx = 1:n())
 
-  # while (remaining_len > na_max_len & iterations < 500) {
-  #   iterations <- iterations + 1
-  #   new_cycle <- dplyr::filter(df_summary, type != "boundary") %>%
-  #     dplyr::filter(n < remaining_len) %>%
-  #     dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1)) %>%
-  #     mutate(.idx = iterations)
-  #
-  #   if (nrow(new_cycle) == 0) {
-  #     break
-  #   }
-  #
-  #   cycles <- dplyr::bind_rows(cycles, new_cycle)
-  #
-  #   remaining_len <- remaining_len - new_cycle$n
-  # }
-
   # Choose initial sign
   init_sign <- sample(c(-1, 1), 1)
 
-  start_df <- dplyr::filter(df, id == start_chunk$id) %>% dplyr::collect()
+  start_df <- dplyr::filter(df, id %in% start_chunk$id) %>% dplyr::collect()
   if (sign(start_df$sig[!is.na(start_df$sig)][1]) != init_sign) {
     start_df$sig <- start_df$sig * -1
   }
 
   cycles_df <- dplyr::filter(df, id %in% cycles$id) %>% dplyr::collect() %>%
-    dplyr::left_join(dplyr::select(cycles, id, .idx), by = "id") %>%
-    dplyr::arrange(.idx, x) %>%
-    dplyr::select(-.idx) %>%
+    left_join(dplyr::select(cycles, id, .idx), by = "id") %>%
+    arrange(.idx, x) %>%
+    select(-.idx) %>%
     mutate(sig = sig*init_sign)
 
-  end_df <- dplyr::filter(df, id == end_chunk$id) %>% dplyr::collect() %>%
-    dplyr::mutate(.idx = 1:dplyr::n()) %>%
-    dplyr::arrange(dplyr::desc(.idx)) %>%
-    dplyr::select(-.idx)
+  end_df <- dplyr::filter(df, id %in% end_chunk$id) %>% dplyr::collect()
   if (sign(end_df$sig[!is.na(end_df$sig)][1]) < 0) {
     end_df$sig <- end_df$sig * -1
   }
