@@ -94,7 +94,7 @@ df_fix_length <- function(full_df, len) {
 #' @import dplyr
 crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
                               con = NULL) {
-  type <- sig <- x <- df_summary <- .idx <- NULL
+  type <- sig <- x <- df_summary <- .idx <- cum_length <- NULL
 
   if (is.null(con)) {
     assertthat::assert_that(is.data.frame(tab))
@@ -146,25 +146,34 @@ crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
   # Get empty cycles data frame with columns as in df_summary
-  cycles <- dplyr::filter(df_summary, 0 == 1) %>%
-    dplyr::mutate(.idx = as.numeric(id))
-  iterations <- 0
+  # cycles <- dplyr::filter(df_summary, 0 == 1) %>%
+  #   dplyr::mutate(.idx = as.numeric(id))
+  # iterations <- 0
 
-  while (remaining_len > na_max_len & iterations < 500) {
-    iterations <- iterations + 1
-    new_cycle <- dplyr::filter(df_summary, type != "boundary") %>%
-      dplyr::filter(n < remaining_len) %>%
-      dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1)) %>%
-      mutate(.idx = iterations)
+  # Need a faster way to do this...
+  cycles <- dplyr::filter(df_summary, type != "boundary")
 
-    if (nrow(new_cycle) == 0) {
-      break
-    }
+  cycle_order <- sample(1:nrow(cycles))
+  cycles <- cycles[cycle_order,] %>%
+    mutate(cum_length = cumsum(n)) %>%
+    filter(cum_length <= remaining_len) %>%
+    mutate(.idx = 1:n())
 
-    cycles <- dplyr::bind_rows(cycles, new_cycle)
-
-    remaining_len <- remaining_len - new_cycle$n
-  }
+  # while (remaining_len > na_max_len & iterations < 500) {
+  #   iterations <- iterations + 1
+  #   new_cycle <- dplyr::filter(df_summary, type != "boundary") %>%
+  #     dplyr::filter(n < remaining_len) %>%
+  #     dplyr::filter(dplyr::row_number() == sample(1:dplyr::n(), 1)) %>%
+  #     mutate(.idx = iterations)
+  #
+  #   if (nrow(new_cycle) == 0) {
+  #     break
+  #   }
+  #
+  #   cycles <- dplyr::bind_rows(cycles, new_cycle)
+  #
+  #   remaining_len <- remaining_len - new_cycle$n
+  # }
 
   # Choose initial sign
   init_sign <- sample(c(-1, 1), 1)
