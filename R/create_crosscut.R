@@ -67,6 +67,83 @@ df_fix_length <- function(full_df, len) {
   }
 }
 
+#' Draw cycles for a resampled bullet sequence
+#'
+#' This function assembles cycles to form a sequence of approximately length
+#' `len` using a summary table with the following information:
+#' \enumerate{
+#' \item id, a variable uniquely identifying the cycle,
+#' \item type, a character or factor variable with values `boundary_indicator`
+#'         and some other value indicating a complete cycle
+#' \item n, the length of the sequence,
+#' \item not_na, the number of non NA values in the sequence
+#' }
+#'
+#' @param len target sequence length
+#' @param tab summary table
+#' @param boundary_indicator character indicating an incomplete cycle
+#' @return a data frame of sampled responses, in order
+#' @importFrom assertthat assert_that has_name
+#' @import dplyr
+cycle_draw <- function(len, tab, boundary_indicator = "boundary") {
+  # Cran check fix warnings - issues with pipe identification of variables
+  . <- .idx <- .type <- type <- cum_length <- NULL
+
+  # Useful for debugging purposes - shouldn't ever be called
+  if (!exists("boundary_indicator")) { boundary_indicator <- "boundary" }
+  if (!exists("len")) { len <- 3000 }
+
+  assertthat::assert_that(
+    is.data.frame(tab),
+    assertthat::has_name(tab, "id"),
+    assertthat::has_name(tab, "type"),
+    assertthat::has_name(tab, "n"),
+    is.numeric(tab$n),
+    is.numeric(len)
+  )
+
+  if (!"not_na" %in% names(tab)) {
+    tab$not_na <- tab$n
+  }
+
+  slice_sum_df_check(tab)
+
+  # Choose initial sign
+  init_sign <- sample(c(-1, 1), 1)
+
+  boundaries <- tab %>%
+    ungroup() %>%
+    dplyr::filter(type %in% boundary_indicator) %>%
+    sample_n(size = 2, replace = T) %>%
+    collect()
+
+  # Choose a starting chunk
+  start_chunk <- boundaries[1,] %>%
+    mutate(.idx = 0, rev = F, sign = init_sign)
+
+  # Choose an ending chunk
+  end_chunk <- boundaries[2,] %>%
+    mutate(.idx = Inf, rev = T, sign = -init_sign)
+
+  na_max_len <- pmax(
+    (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na),
+    min(tab$n[!tab$type %in% boundary_indicator])
+  )
+  remaining_len <- len - start_chunk$not_na - end_chunk$not_na
+
+  cycles <- dplyr::filter(tab, !type %in% boundary_indicator) %>%
+    sample_n(size = nrow(.), replace = T) %>%
+    collect() %>%
+    mutate(cum_length = cumsum(n)) %>%
+    filter(cum_length <= remaining_len | row_number() == 1) %>%
+    mutate(.idx = 1:n(), sign = init_sign, rev = F)
+
+  cycles <- bind_rows(start_chunk, cycles, end_chunk) %>%
+    mutate(.idx = 1:n() - 1)
+
+  cycles
+}
+
 #' Assemble a "resampled" bullet sequence
 #'
 #' This function assembles a sequence of length `len` from a table (or database)
@@ -79,98 +156,64 @@ df_fix_length <- function(full_df, len) {
 #' }
 #'
 #' @param len target sequence length
-#' @param tab if a db connection is passed in, this should be a character vector
-#'     of length two, giving the name of the full table and the summary table.
-#'     The full table should have (at least) columns id, sig, and type
-#'     (boundary or otherwise). The summary table should have columns id, type,
-#'     n (the length of the chunk), and not_na (the number of non-na pieces).
-#'     The full table should have all sequence pieces which are to be resampled.
-#'     If a scalar is supplied, the summary table will be generated within the
-#'     function. If a db connection is not available, this should be a data
-#'     frame with the relevant information.
-#' @param con database connection
+#' @param df data frame with columns id, sig, and type (boundary or otherwise).
+#'          Can also be a dplyr tbl from a database. This data frame should
+#'          have all sequence pieces which are to be resampled, and id should
+#'          uniquely identify a sequence piece.
+#' @param df_summary (optional) summary of df, will be generated if it is not
+#'          provided. Can be a dplyr tbl from a database. The summary table
+#'          should have columns id, type, n (the length of the chunk), and
+#'          not_na (the number of non-na pieces).
+#' @param output_res resolution of output crosscut in microns. Defaults to 0.645
+#' @param show_plot useful for debugging; requires ggplot2
+#' @param ... additional arguments passed to `cycle_draw()` function. May
+#'          include `boundary_indicator` if type = 'boundary' is not used to
+#'          denote a boundary chunk in df.
 #' @export
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
-crosscut_assemble <- function(len, tab = c('bullet.slice', 'bullet.slice.idx'),
-                              con = NULL) {
-  type <- sig <- x <- df_summary <- .idx <- cum_length <- NULL
+crosscut_assemble <- function(len, df, df_summary = NULL,
+                              output_res = 0.645,
+                              show_plot = F) {
+  # Cran check fix warnings - issues with pipe identification of variables
+  type <- . <- sig <- x <- df_summary <- .idx <- cum_length <- NULL
 
-  if (is.null(con)) {
-    assertthat::assert_that(is.data.frame(tab))
-    assertthat::assert_that(assertthat::has_name(tab, "sig"))
-    df <- tab
-    slice_df_check(df)
-    df_summary <- df %>% group_by(id, type) %>%
-      summarize(n = n(),
-                not_na = sum(!is.na(sig))) %>%
-      ungroup()
+  # Useful for debugging purposes - shouldn't ever be called
+  if (!exists("output_res")) { output_res <- 0.645 }
+  if (!exists("show_plot")) { show_plot <- T }
 
-    slice_sum_df_check(df_summary)
-  } else if (length(tab) == 2) {
-    assertthat::assert_that(is.character(tab))
-    df <- dplyr::tbl(con, tab[1])
-    slice_df_check(df)
-    df_summary <- dplyr::tbl(con, tab[2]) %>%
-      dplyr::collect()
-    slice_sum_df_check(df_summary)
-  } else if (length(tab) == 1) {
-    assertthat::assert_that(is.character(tab))
-    df <- dplyr::tbl(con, tab)
-    slice_df_check(df)
+  # Check df
+  slice_df_check(df)
+
+  if (is.null(df_summary)) {
     df_summary <- df %>%
       group_by(id, type) %>%
-      collect() %>%
       summarize(n = n(),
-                not_na = sum(!is.na(sig))) %>%
-      ungroup()
-    slice_sum_df_check(df_summary)
-  } else {
-    stop("tab must be either a data frame or a character vector containing the table name(s)")
+                not_na = sum(!is.na(sig), na.rm = T)) %>%
+      ungroup() %>%
+      collect()
   }
 
-  stopifnot(exists("df_summary"))
+  slice_sum_df_check(df_summary)
 
-  # Choose a starting chunk
-  start_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
-    dplyr::sample_n(size = 1)
+  cycle_idx <- cycle_draw(len, tab = df_summary)
 
-  # Choose an ending chunk
-  end_chunk <- dplyr::filter(df_summary, type == "boundary") %>%
-    dplyr::sample_n(size = 1)
-
-  na_max_len <- pmax(
-    (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na),
-    min(df_summary$n[df_summary$type != 'boundary'])
-  )
-  remaining_len <- len - start_chunk$not_na - end_chunk$not_na
-
-  cycles <- dplyr::filter(df_summary, type != "boundary") %>%
-    sample_n(size = nrow(.), replace = T) %>%
-    mutate(cum_length = cumsum(n)) %>%
-    filter(cum_length <= remaining_len) %>%
-    mutate(.idx = 1:n())
-
-  # Choose initial sign
-  init_sign <- sample(c(-1, 1), 1)
-
-  start_df <- dplyr::filter(df, id %in% start_chunk$id) %>% dplyr::collect()
-  if (sign(start_df$sig[!is.na(start_df$sig)][1]) != init_sign) {
-    start_df$sig <- start_df$sig * -1
-  }
-
-  cycles_df <- dplyr::filter(df, id %in% cycles$id) %>% dplyr::collect() %>%
-    left_join(dplyr::select(cycles, id, .idx), by = "id") %>%
+  cycles_df <- dplyr::filter(df, id %in% cycle_idx$id) %>%
+    collect() %>%
+    left_join(dplyr::select(cycle_idx, id, .idx, rev, sign), by = "id") %>%
+    mutate(sig = sign*sig) %>%
+    group_by(.idx) %>%
+    mutate(x = ifelse(rev, -x, x)) %>%
+    ungroup() %>%
     arrange(.idx, x) %>%
-    select(-.idx) %>%
-    mutate(sig = sig*init_sign)
+    mutate(x = seq(0, by = output_res, length.out = nrow(.))) %>%
+    select(-rev, -sign)
 
-  end_df <- dplyr::filter(df, id %in% end_chunk$id) %>% dplyr::collect()
-  if (sign(end_df$sig[!is.na(end_df$sig)][1]) < 0) {
-    end_df$sig <- end_df$sig * -1
+  if (show_plot) {
+    cycles_df %>%
+    ggplot2::ggplot(ggplot2::aes(x, sig, color = factor(.idx))) +
+      ggplot2::geom_line()
   }
 
-  full_df <- dplyr::bind_rows(start_df, cycles_df, end_df)
-
-  df_fix_length(full_df, len)
+  df_fix_length(cycles_df, len)
 }
