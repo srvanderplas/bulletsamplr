@@ -5,7 +5,7 @@ sudo: false
 cache: packages
 
 r_packages:
-  - covr
+  - covr,RSQLite,ggplot2
 
 r_binary_packages:
   - rgl
