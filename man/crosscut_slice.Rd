@@ -4,18 +4,10 @@
 \alias{crosscut_slice}
 \title{Slice signature into cycles}
 \usage{
-crosscut_slice(x, cycle_type = "full", ...)
+crosscut_slice(x)
 }
 \arguments{
 \item{x}{a numeric vector with signature information}
-
-\item{cycle_type}{one of 'half' or 'full'. Half-cyles start at the default
-value, reach a local max or min, and then return to the default
-value. Full cycles start at the default value, reach a local max or
-min, return to the default, reach a local min or max, and then
-return to the default value.}
-
-\item{...}{additional parameters passed to bulletxtrctr::sig_get_peaks}
 }
 \value{
 a list of vectors with signature cycles

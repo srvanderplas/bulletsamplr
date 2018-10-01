@@ -4,23 +4,29 @@
 \alias{crosscut_assemble}
 \title{Assemble a "resampled" bullet sequence}
 \usage{
-crosscut_assemble(len, tab = c("bullet.slice", "bullet.slice.idx"),
-  con = NULL)
+crosscut_assemble(len, df, df_summary = NULL, output_res = 0.645,
+  show_plot = F)
 }
 \arguments{
 \item{len}{target sequence length}
 
-\item{tab}{if a db connection is passed in, this should be a character vector
-of length two, giving the name of the full table and the summary table.
-The full table should have (at least) columns id, sig, and type
-(boundary or otherwise). The summary table should have columns id, type,
-n (the length of the chunk), and not_na (the number of non-na pieces).
-The full table should have all sequence pieces which are to be resampled.
-If a scalar is supplied, the summary table will be generated within the
-function. If a db connection is not available, this should be a data
-frame with the relevant information.}
+\item{df}{data frame with columns id, sig, and type (boundary or otherwise).
+Can also be a dplyr tbl from a database. This data frame should
+have all sequence pieces which are to be resampled, and id should
+uniquely identify a sequence piece.}
 
-\item{con}{database connection}
+\item{df_summary}{(optional) summary of df, will be generated if it is not
+provided. Can be a dplyr tbl from a database. The summary table
+should have columns id, type, n (the length of the chunk), and
+not_na (the number of non-na pieces).}
+
+\item{output_res}{resolution of output crosscut in microns. Defaults to 0.645}
+
+\item{show_plot}{useful for debugging; requires ggplot2}
+
+\item{...}{additional arguments passed to `cycle_draw()` function. May
+include `boundary_indicator` if type = 'boundary' is not used to
+denote a boundary chunk in df.}
 }
 \description{
 This function assembles a sequence of length `len` from a table (or database)

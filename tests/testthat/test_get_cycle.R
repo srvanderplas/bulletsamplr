@@ -17,8 +17,8 @@ test_that("crosscut_slice works as expected", {
   tmp3 <- crosscut_slice(mutate(test_slice_sig, sig = -sig))
   expect_equal(length(tmp3), 6)
   walk(tmp3[2:(length(tmp3) - 1)], function(x){
-    expect_equal(sum(diff(x$sig < 0) == -1), 1)
+    expect_equal(sum(diff(x$sig > 0) == -1), 1)
   })
-  walk2(tmp, tmp3, ~expect_equivalent(.x$sig, -.y$sig))
+  walk2(tmp, tmp3, ~expect_equivalent(.x$sig, .y$sig))
 
 })

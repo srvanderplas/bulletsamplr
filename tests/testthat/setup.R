@@ -19,7 +19,8 @@ test_slice_sig <- bind_rows(
              sig = asin(sin(x)), len = length(x)),
   data_frame(id = "sharp2", type = "pn", x = seq(0, pi, by = .01),
              sig = asin(sin(2*x)), len = length(x))
-)
+) %>%
+  mutate(x = seq(1, 10, length.out = nrow(.)))
 
 split_idx <- map_df(
   unique(test_slice_sig$id),
@@ -32,7 +33,7 @@ split_idx <- map_df(
 
 test_slice_table <- test_slice_sig %>%
   left_join(split_idx, by = "id") %>%
-  nest(-split_idx) %>%
+  tidyr::nest(-split_idx) %>%
   mutate(
     tab = map2(split_idx, data, function(idx, data) {
       if (unique(data$type) ==  "pn") {
@@ -48,4 +49,4 @@ test_slice_table <- test_slice_sig %>%
     })
   ) %>%
   select(-split_idx, -data) %>%
-  unnest()
+  tidyr::unnest()

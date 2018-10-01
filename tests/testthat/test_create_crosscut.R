@@ -16,16 +16,18 @@ if ("RSQLite" %in% installed.packages()) {
 test_that("crosscut_assemble works as expected", {
 
   set.seed(52093)
-  tmp <- crosscut_assemble(1000, test_slice_table)
+  tmp <- crosscut_assemble(1000, df = test_slice_table)
   expect_equal(nrow(tmp), 1000)
+  expect_lte(diff(tmp$sig) %>% abs %>% max(na.rm = T), .02)
 
   if (sql_tests & exists("db_con")) {
     set.seed(52093)
-    tmp2 <- crosscut_assemble(1000, "bullet.slice", con = db_con)
+    tmp2 <- crosscut_assemble(1000, df = tbl(db_con, "bullet.slice"))
     expect_equivalent(tmp, tmp2)
 
     set.seed(52093)
-    tmp3 <- crosscut_assemble(1000, con = db_con)
+    tmp3 <- crosscut_assemble(1000, df = tbl(db_con, "bullet.slice"),
+                              df_summary = tbl(db_con, "bullet.slice.idx"))
     expect_equivalent(tmp, tmp3)
   }
 
