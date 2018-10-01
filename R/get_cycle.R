@@ -1,12 +1,14 @@
+## @useDynLib bulletsamplr
+## @importFrom Rcpp sourceCpp
+## NULL
+#
+# .onUnload <- function(libpath) {
+#   library.dynam.unload("bulletsamplr", libpath)
+# }
+
 #' Slice signature into cycles
 #'
 #' @param x a numeric vector with signature information
-#' @param cycle_type one of 'half' or 'full'. Half-cyles start at the default
-#'          value, reach a local max or min, and then return to the default
-#'          value. Full cycles start at the default value, reach a local max or
-#'          min, return to the default, reach a local min or max, and then
-#'          return to the default value.
-#' @param ... additional parameters passed to bulletxtrctr::sig_get_peaks
 #' @return a list of vectors with signature cycles
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
@@ -17,7 +19,9 @@
 #' data("sig")
 #' crosscut_slice(sig) # Slice whole data frame
 #' crosscut_slice(sig$sig) # Slice signature only
-crosscut_slice <- function(x, cycle_type = 'full', ...) {
+crosscut_slice <- function(x) {
+  .type <- NULL
+
   if (!is.numeric(x)) {
     assertthat::assert_that(
       assertthat::has_name(x, "sig"),
@@ -28,9 +32,6 @@ crosscut_slice <- function(x, cycle_type = 'full', ...) {
     sig <- x
   }
 
-  assertthat::assert_that(
-    cycle_type %in% c("half", "full"),
-    msg = "cycle_type must be one of 'half' or 'full'")
   assertthat::assert_that(is.numeric(sig))
 
   # Get residual structure in one object, peak height in another; then combine
@@ -46,45 +47,57 @@ crosscut_slice <- function(x, cycle_type = 'full', ...) {
   p2n <- intersect(pos + 1, neg) # get pos-to-neg transition
 
   # Index
-  cycle_type <- ifelse(n2p[1] > p2n[1], "pn", "np")
-  idx <- if (cycle_type == "pn") {
+  cycle <- ifelse(n2p[1] > p2n[1], "pn", "np")
+  idx <- if (cycle == "pn") {
     n2p
   } else {
     p2n
   }
 
   sig_idx <- data_frame(
-    chunk = 0:length(idx),
-    start = c(1, idx),
-    end = c(idx - 1, length(sig)),
-    type = c("start", rep(cycle_type, length(idx) - 1), "end")
+    map_chunk = 0:length(idx),
+    map_start = c(1, idx),
+    map_end = c(idx - 1, length(sig)),
+    map_type = c("start", rep(cycle, length(idx) - 1), "end")
   )
 
-  chunks <- purrr::pmap(sig_idx, function(chunk, start, end, type) {
+  chunks <- purrr::pmap(sig_idx,
+                        function(map_chunk, map_start, map_end, map_type) {
     z <- if (is.data.frame(x)) {
-      x[start:end,]
+      x[map_start:map_end,]
     } else {
       data_frame(
-        x = start:end,
-        sig = sig[start:end]
+        x = map_start:map_end,
+        sig = sig[map_start:map_end]
       )
     }
+    z$.type <- map_type
 
-    if (type == "end") {
-      z$x <- -z$x
+    if (map_type == "end") {
+      # z$x <- -z$x + max(z$x)
       z$sig <- rev(z$sig)
-      z <- arrange(z, x)
+    }
+
+    z <- z %>%
+      mutate(
+        x = x - min(x, na.rm = T),
+        sig = sig - med_val,
+        .chunk = map_chunk
+      )
+
+    # ensure chunks end on a negative note
+    last <- max(which(!is.na(z$sig)))
+    sgn <- z$sig[(last - 1):last] %>% sign() %>% mean(na.rm = T) %>% sign()
+    if ((map_type == "start" | map_type == "end" | map_type == "boundary") &
+        sgn > 0) {
+      z$sig <- -z$sig
     }
 
     z %>%
-      mutate(
-        sig = sig - med_val,
-        chunk = chunk,
-        type = type
-      ) %>%
-      mutate(sig = ifelse(type == "np", -sig, sig),
-             type = ifelse(type == "np", "pn", type),
-             type = ifelse(type == "pn", "pn", "boundary"))
+      mutate(sig = ifelse(.type == "np", -sig, sig),
+             .type = ifelse(.type == "np", "pn", .type),
+             .type = ifelse(.type == "pn", "pn", "boundary")) %>%
+      mutate(x = ifelse(.type == 'boundary', x - max(x, na.rm = T), x))
   })
 
   chunks
