@@ -14,7 +14,7 @@ Description: Resamples land signatures from NIST's NRBTD or from provided data,
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-Suggests: 
+Suggests:
     testthat,
     roxygen2,
     x3ptools,
@@ -23,16 +23,19 @@ Suggests:
     odbc,
     RSQLite,
     dbplyr,
-    tidyr
+    tidyr,
+    ggplot2
 Imports:
     bulletxtrctr,
     dplyr,
     assertthat,
-    purrr
-Remotes: 
+    purrr,
+    Rcpp
+Remotes:
     heike/bulletxtrctr,
     heike/x3ptools,
     klutometis/roxygen
 Depends:
     R (>= 2.10)
 RoxygenNote: 6.1.0.9000
+LinkingTo: Rcpp
