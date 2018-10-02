@@ -4,14 +4,14 @@
 \alias{cycle_draw}
 \title{Draw cycles for a resampled bullet sequence}
 \usage{
-cycle_draw(len, tab, boundary_indicator = "boundary")
+cycle_draw(len, df_summary_, boundary_indicator = "boundary")
 }
 \arguments{
 \item{len}{target sequence length}
 
-\item{tab}{summary table}
-
 \item{boundary_indicator}{character indicating an incomplete cycle}
+
+\item{tab}{summary table}
 }
 \value{
 a data frame of sampled responses, in order
