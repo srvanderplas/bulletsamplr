@@ -85,7 +85,7 @@ df_fix_length <- function(full_df, len) {
 #' @return a data frame of sampled responses, in order
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
-cycle_draw <- function(len, tab, boundary_indicator = "boundary") {
+cycle_draw <- function(len, df_summary_, boundary_indicator = "boundary") {
   # Cran check fix warnings - issues with pipe identification of variables
   . <- .idx <- .type <- type <- cum_length <- NULL
 
@@ -93,47 +93,41 @@ cycle_draw <- function(len, tab, boundary_indicator = "boundary") {
   if (!exists("boundary_indicator")) { boundary_indicator <- "boundary" }
   if (!exists("len")) { len <- 3000 }
 
-  assertthat::assert_that(
-    is.data.frame(tab),
-    assertthat::has_name(tab, "id"),
-    assertthat::has_name(tab, "type"),
-    assertthat::has_name(tab, "n"),
-    is.numeric(tab$n),
-    is.numeric(len)
-  )
+  assertthat::assert_that(is.numeric(len))
+  slice_sum_df_check(df_summary_)
 
-  if (!"not_na" %in% names(tab)) {
-    tab$not_na <- tab$n
+  if (!"not_na" %in% names(df_summary_)) {
+    df_summary_$not_na <- df_summary_$n
   }
-
-  slice_sum_df_check(tab)
 
   # Choose initial sign
   init_sign <- sample(c(-1, 1), 1)
 
-  boundaries <- tab %>%
-    ungroup() %>%
+  boundaries <- df_summary_ %>%
     dplyr::filter(type %in% boundary_indicator) %>%
-    sample_n(size = 2, replace = T) %>%
     collect()
 
+  boundary_sample <- boundaries %>%
+    dplyr::sample_n(size = 2, replace = T)
+
   # Choose a starting chunk
-  start_chunk <- boundaries[1,] %>%
+  start_chunk <- boundary_sample[1,] %>%
     mutate(.idx = 0, rev = F, sign = init_sign)
 
   # Choose an ending chunk
-  end_chunk <- boundaries[2,] %>%
+  end_chunk <- boundary_sample[2,] %>%
     mutate(.idx = Inf, rev = T, sign = -init_sign)
 
   na_max_len <- pmax(
     (start_chunk$n - start_chunk$not_na) + (end_chunk$n - end_chunk$not_na),
-    min(tab$n[!tab$type %in% boundary_indicator])
+    min(boundaries$n),
+    100
   )
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
-  cycles <- dplyr::filter(tab, !type %in% boundary_indicator) %>%
-    sample_n(size = nrow(.), replace = T) %>%
+  cycles <- dplyr::filter(df_summary_, !type %in% boundary_indicator) %>%
     collect() %>%
+    sample_n(size = nrow(.), replace = T) %>%
     mutate(cum_length = cumsum(n)) %>%
     filter(cum_length <= remaining_len | row_number() == 1) %>%
     mutate(.idx = 1:n(), sign = init_sign, rev = F)
@@ -169,18 +163,22 @@ cycle_draw <- function(len, tab, boundary_indicator = "boundary") {
 #' @param ... additional arguments passed to `cycle_draw()` function. May
 #'          include `boundary_indicator` if type = 'boundary' is not used to
 #'          denote a boundary chunk in df.
+#' @param fill when the sequence has nearly len values, should it be padded?
+#'          Otherwise, the returned sequence may differ slightly from the
+#'          specified length.
 #' @export
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
 crosscut_assemble <- function(len, df, df_summary = NULL,
                               output_res = 0.645,
-                              show_plot = F) {
+                              show_plot = F, fill = T) {
   # Cran check fix warnings - issues with pipe identification of variables
-  type <- . <- sig <- x <- df_summary <- .idx <- cum_length <- NULL
+  type <- . <- sig <- x <- .idx <- cum_length <- NULL
 
   # Useful for debugging purposes - shouldn't ever be called
   if (!exists("output_res")) { output_res <- 0.645 }
   if (!exists("show_plot")) { show_plot <- T }
+  if (!exists("fill")) { fill <- T }
 
   # Check df
   slice_df_check(df)
@@ -194,12 +192,14 @@ crosscut_assemble <- function(len, df, df_summary = NULL,
       collect()
   }
 
-  slice_sum_df_check(df_summary)
+  # slice_sum_df_check(df_summary)
 
-  cycle_idx <- cycle_draw(len, tab = df_summary)
+  cycle_idx <- cycle_draw(len, df_summary)
 
   cycles_df <- dplyr::filter(df, id %in% cycle_idx$id) %>%
-    collect() %>%
+    collect()
+
+  cycles_df <- cycles_df %>%
     left_join(dplyr::select(cycle_idx, id, .idx, rev, sign), by = "id") %>%
     mutate(sig = sign*sig) %>%
     group_by(.idx) %>%
@@ -215,5 +215,9 @@ crosscut_assemble <- function(len, df, df_summary = NULL,
       ggplot2::geom_line()
   }
 
-  df_fix_length(cycles_df, len)
+  if (fill) {
+    df_fix_length(cycles_df, len)
+  } else {
+    cycles_df
+  }
 }
