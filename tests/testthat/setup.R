@@ -3,6 +3,7 @@ library(DBI)
 library(odbc)
 library(RSQLite)
 library(dplyr)
+library(purrr)
 
 # Generate test slices
 set.seed(40920793)

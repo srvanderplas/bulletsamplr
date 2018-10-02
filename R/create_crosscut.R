@@ -207,7 +207,8 @@ crosscut_assemble <- function(len, df, df_summary = NULL,
     ungroup() %>%
     arrange(.idx, x) %>%
     mutate(x = seq(0, by = output_res, length.out = nrow(.))) %>%
-    select(-rev, -sign)
+    select(-rev, -sign) %>%
+    mutate(sig = sig - median(sig, na.rm = T))
 
   if (show_plot) {
     cycles_df %>%
