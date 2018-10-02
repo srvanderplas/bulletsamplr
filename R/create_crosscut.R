@@ -172,6 +172,7 @@ cycle_draw <- function(len, tab, boundary_indicator = "boundary") {
 #' @export
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
+#' @importFrom stats median
 crosscut_assemble <- function(len, df, df_summary = NULL,
                               output_res = 0.645,
                               show_plot = F) {
