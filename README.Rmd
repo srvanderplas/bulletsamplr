@@ -32,34 +32,72 @@ devtools::install_github("srvanderplas/bulletsamplr")
 
 ## Example
 
-The threshold bootstrap creates new sequences by resampling "cycles" from actual data. These cycles are created as follows:
-```{r, fig.cap = "Bullet Signature"}
+```{r setup-pkg, message = F, warning = F}
 library(ggplot2)
 library(bulletsamplr)
 library(dplyr)
 
 data(sig)
-ggplot(aes(x = x, y = sig), data = sig) + 
-  geom_line() + 
-  ggtitle("Original Signature")
 ```
 
-```{r, fig.cap = "Bullet Signature. Cycles are created when the sequence crosses the median, and include one positive region and one negative region. This ensures continuity between adjacent segments."}
+We start with a signature from a scanned bullet land: 
+```{r, fig.cap = "Land Signature", warning = F}
+ggplot(aes(x = x, y = sig), data = sig) + 
+  geom_line() + 
+  ggtitle("Original Signature") + 
+  theme(axis.title = element_blank(), axis.text.x = element_blank())
+```
+
+The threshold bootstrap creates new sequences by resampling "cycles" from actual data. These cycles are created as follows:
+
+First, the median of the signature is used to divide the signature into __cycles__ of one positive and one negative region of the signature (relative to the median value). 
+```{r, fig.cap = "Land Signature. Cycles are created when the sequence crosses the median, and include one positive region and one negative region. This ensures continuity between adjacent segments."}
 threshold <- median(sig$sig, na.rm = T)
 ggplot(aes(x = x, y = sig), data = sig) + 
   geom_line() + 
   geom_hline(aes(yintercept = threshold), color = "red") + 
-  ggtitle("Threshold used to create cycles for future sample signatures")
+  ggtitle("Threshold used to create cycles for future sample signatures") + 
+  theme(axis.title = element_blank(), axis.text.x = element_blank())
 ```
 
+These divisions are shown below, with each segment in a different color; adjacent segments are disjoint.
 
-```{r, fig.cap = ""}
+```{r chunk-slices}
 sig_slices <- crosscut_slice(sig) %>% bind_rows() %>%
-  group_by(chunk) %>%
-  mutate(x = x - mean(x, na.rm = T))
-sig_slices$chunk_label <- factor(sig_slices$chunk, labels = c("boundary_start", paste("cycle", unique(sig_slices$chunk)[-c(1, max(sig_slices$chunk))]), "boundary_end"))
+  group_by(.chunk) %>%
+  # mutate(x = x - mean(x, na.rm = T)) %>%
+  ungroup()
 
-ggplot(aes(x = x, y = sig), data = sig_slices) + 
-  facet_wrap(~chunk_label, scales = "free") + 
-  geom_line()
+sig_slices %>%
+  group_by(.chunk) %>%
+  mutate(x = ifelse(.chunk == max(sig_slices$.chunk), rev(x), x)) %>%
+  mutate(sig = ifelse(.chunk == max(sig_slices$.chunk), -sig, sig)) %>%
+  ungroup() %>%
+  arrange(.chunk, x) %>%
+  mutate(xnew = 1:nrow(.)) %>%
+ggplot(data = ., aes(x = xnew*1.5625, y = sig, color = factor(.chunk))) + geom_line() + 
+  scale_color_discrete("Chunk") + 
+  ggtitle("Cycles (and boundary regions)") + 
+  theme(axis.title = element_blank(), axis.text.x = element_blank())
+
 ```
+
+The cycles are then post-processed so that they all share the same orientation (positive portion of the cycle first); this requires that the boundary chunks be oriented so that the final portion of the chunk is negative. End chunks are thus reversed (in x) and may be flipped in y depending on the original orientation. 
+
+```{r, fig.cap = "Slices of land signature. Note that the boundary_end slice has been reversed (in x) and flipped (in y) so that it is 'in phase' with the positive-to-negative cycles in the main portion of the signature."}
+
+sig_slices$chunk_label <- factor(
+  sig_slices$.chunk, 
+  labels = c("boundary_start", 
+             paste("cycle", unique(sig_slices$.chunk)[-c(1, max(sig_slices$.chunk))]), 
+             "boundary_end"))
+
+ggplot(aes(x = x, y = sig, group = .chunk), data = sig_slices) + 
+  facet_wrap(~chunk_label, scales = "free") +
+  geom_line() + theme(axis.title = element_blank()) + 
+  ggtitle("Sliced Land Signature")
+```
+
+The cycles can then be saved to a database, or the data frame of cycles can be reassembled directly into new sequences. Ideally, of course, new sequences would be assembled from a library composed of cycles from many different signatures. 
+
+
