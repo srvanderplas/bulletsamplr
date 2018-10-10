@@ -5,7 +5,7 @@
 \title{Assemble a "resampled" bullet sequence}
 \usage{
 crosscut_assemble(len, df, df_summary = NULL, output_res = 0.645,
-  show_plot = F)
+  show_plot = F, fill = T)
 }
 \arguments{
 \item{len}{target sequence length}
@@ -23,6 +23,10 @@ not_na (the number of non-na pieces).}
 \item{output_res}{resolution of output crosscut in microns. Defaults to 0.645}
 
 \item{show_plot}{useful for debugging; requires ggplot2}
+
+\item{fill}{when the sequence has nearly len values, should it be padded?
+Otherwise, the returned sequence may differ slightly from the
+specified length.}
 
 \item{...}{additional arguments passed to `cycle_draw()` function. May
 include `boundary_indicator` if type = 'boundary' is not used to

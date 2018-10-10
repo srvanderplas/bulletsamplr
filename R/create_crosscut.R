@@ -85,7 +85,7 @@ df_fix_length <- function(full_df, len) {
 #' @return a data frame of sampled responses, in order
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
-cycle_draw <- function(len, df_summary_, boundary_indicator = "boundary") {
+cycle_draw <- function(len, tab, boundary_indicator = "boundary") {
   # Cran check fix warnings - issues with pipe identification of variables
   . <- .idx <- .type <- type <- cum_length <- NULL
 
@@ -94,16 +94,16 @@ cycle_draw <- function(len, df_summary_, boundary_indicator = "boundary") {
   if (!exists("len")) { len <- 3000 }
 
   assertthat::assert_that(is.numeric(len))
-  slice_sum_df_check(df_summary_)
+  slice_sum_df_check(tab)
 
-  if (!"not_na" %in% names(df_summary_)) {
-    df_summary_$not_na <- df_summary_$n
+  if (!"not_na" %in% names(tab)) {
+    tab$not_na <- tab$n
   }
 
   # Choose initial sign
   init_sign <- sample(c(-1, 1), 1)
 
-  boundaries <- df_summary_ %>%
+  boundaries <- tab %>%
     dplyr::filter(type %in% boundary_indicator) %>%
     collect()
 
@@ -125,7 +125,7 @@ cycle_draw <- function(len, df_summary_, boundary_indicator = "boundary") {
   )
   remaining_len <- len - start_chunk$not_na - end_chunk$not_na
 
-  cycles <- dplyr::filter(df_summary_, !type %in% boundary_indicator) %>%
+  cycles <- dplyr::filter(tab, !type %in% boundary_indicator) %>%
     collect() %>%
     sample_n(size = nrow(.), replace = T) %>%
     mutate(cum_length = cumsum(n)) %>%
@@ -169,6 +169,7 @@ cycle_draw <- function(len, df_summary_, boundary_indicator = "boundary") {
 #' @export
 #' @importFrom assertthat assert_that has_name
 #' @import dplyr
+#' @importFrom stats median
 crosscut_assemble <- function(len, df, df_summary = NULL,
                               output_res = 0.645,
                               show_plot = F, fill = T) {
