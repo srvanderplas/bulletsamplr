@@ -104,4 +104,9 @@ The cycles can then be saved to a database, or the data frame of cycles can be r
 
 ### Resampling cycles to create new sequences
 
+```{r}
+# Load sample signature slices
+data(signature_slices)
 
+
+```
