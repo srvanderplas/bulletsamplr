@@ -1,0 +1,42 @@
+---
+title: "bulletsamplr"
+author: "Susan VanderPlas"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{bulletsamplr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+# Introduction
+
+## Null Distributions in Forensic Statistics
+
+## Threshold Bootstrap
+
+Misappropriated from time-series statistics; important because it maintains continuity and should be relatively differentiable (in practice)
+
+## Description of Hamby studies
+
+# Threshold bootstrap and bullet signatures
+
+## Consecutive Matching Striae and resampling
+
+## Theoretical probability of signature overlap due to same-piece resampling
+
+## Computational assessment
+
+# Case study: Resampling Hamby bullet signatures
+
+
+
+# Conclusion
