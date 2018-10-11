@@ -24,7 +24,9 @@ Suggests:
     RSQLite,
     dbplyr,
     tidyr,
-    ggplot2
+    ggplot2,
+    knitr,
+    rmarkdown
 Imports:
     bulletxtrctr,
     dplyr,
@@ -39,3 +41,4 @@ Depends:
     R (>= 2.10)
 RoxygenNote: 6.1.0.9000
 LinkingTo: Rcpp
+VignetteBuilder: knitr
