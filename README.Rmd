@@ -40,6 +40,8 @@ library(dplyr)
 data(sig)
 ```
 
+### Creating cycles for resampling
+
 We start with a signature from a scanned bullet land: 
 ```{r, fig.cap = "Land Signature", warning = F}
 ggplot(aes(x = x, y = sig), data = sig) + 
@@ -99,5 +101,7 @@ ggplot(aes(x = x, y = sig, group = .chunk), data = sig_slices) +
 ```
 
 The cycles can then be saved to a database, or the data frame of cycles can be reassembled directly into new sequences. Ideally, of course, new sequences would be assembled from a library composed of cycles from many different signatures. 
+
+### Resampling cycles to create new sequences
 
 
