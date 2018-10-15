@@ -1,0 +1,205 @@
+---
+title: "Exploring Sequence Matching with No Overlapping Regions"
+author: "Susan VanderPlas"
+date: "10/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(odbc)
+library(bulletsamplr)
+library(bulletxtrctr)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(dbplyr)
+library(randomForest)
+```
+```{r sim-setup}
+con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
+N <- 300
+nshow <- 6
+```
+
+One way around the matching set problem is to divide the barrels up into two groups, and compare sequences assembled from each group. 
+
+```{r}
+barrels <- tbl(con, "bullet.slice") %>%
+  collect() %>%
+  mutate(barrel = str_replace_all(id, ".*_(\\d{2})-.*", "\\1"))
+
+evens <- filter(barrels, barrel %in% c("02", "04", "06", "08", "10"))
+odds <- filter(barrels, barrel %in% c("01", "03", "05", "07", "09"))
+
+set.seed(2090490723)
+evenseq <- purrr::map_df(1:N, ~crosscut_assemble(2000, evens), .id = "seq") %>%
+  mutate(seqtype = 'even')
+oddseq <- purrr::map_df(1:N, ~crosscut_assemble(2000, odds), .id = "seq") %>%
+  mutate(seqtype = 'odd')
+```
+
+Plotting the first `r nshow` sequences from each set, 
+
+```{r, fig.cap = 'First few sequences assembled. Even sequences were assembled from even-numbered barrels in Hamby sets; odd sequences from odd numbered barrels. This guarantees that there is no possibility that two sequences which are compared have chunks drawn from the same region of the same barrel.'}
+first5 <- bind_rows(
+  filter(evenseq, seq %in% as.character(1:nshow)),
+  filter(oddseq, seq %in% as.character(1:nshow))
+)
+
+first5 %>%
+  ggplot(aes(x = x, y = sig, color = seqtype)) + geom_line() + 
+  facet_wrap(~seq)
+```
+
+We can now align each sequence:
+
+```{r, fig.cap = 'First few sequences after alignment'}
+
+aligned <- purrr::map2(tidyr::nest(evenseq, -seqtype, -seq)$data,
+                       tidyr::nest(oddseq, -seqtype, -seq)$data,
+                       ~ sig_align(.x$sig, .y$sig))
+
+aligned_df <- data_frame(
+  ccf = sapply(aligned, function(x) x$ccf),
+  lag = sapply(aligned, function(x) x$lag),
+  df = purrr::map(aligned, ~.$lands)
+)
+
+first5 <- aligned_df[1:nshow,] %>%
+  mutate(i = 1:n()) %>%
+  unnest() %>%
+  gather(key = seqtype, value = sig, sig1:sig2)
+  
+first5 %>%
+  ggplot(aes(x = x, y = sig, color = seqtype)) + geom_line() + 
+  facet_wrap(~i)
+```
+
+
+We can also examine the maximum ccf of each aligned sequence:
+```{r, fig.cap = 'Distribution of maximum cross-correlation for randomly assembled sequences with no possibility of same-barrel overlap'}
+aligned_df %>%
+  ggplot(aes(x = ccf)) + geom_density() + 
+  geom_rug()
+```
+
+We can see that the ccf of each aligned sequence varies between .1 and .6, with the majority of sequences having a ccf of .3 - .4. 
+
+## Null Feature Distribution
+
+Using the aligned sequences, we can calculate striae alignment and features:
+```{r}
+striae <- purrr::map(aligned, sig_cms_max, span = 75)
+
+striae_df <- data_frame(
+  maxCMS = sapply(striae, function(x) x$maxCMS),
+  ccf = sapply(striae, function(x) x$ccf),
+  lag = sapply(striae, function(x) x$lag),
+  lines = purrr::map(striae, ~.$lines),
+  lands = purrr::map(striae, ~.$lands)
+)
+
+features <- purrr::map_df(striae, extract_features_all_legacy, resolution = 0.625)
+features$rfscore <- predict(newdata = features, object = rtrees, type = 'prob')[,2]
+```
+
+The null distribution of random forest score is:
+```{r}
+ggplot(data = features, aes(x = rfscore)) + 
+  geom_histogram(color = "black") + 
+  scale_x_continuous("Random Forest Match Score") + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Random Forest Match Score")
+```
+
+### Cross-Correlation
+
+```{r}
+ggplot(data = features, aes(x = ccf)) + 
+  geom_histogram(color = "black") + 
+  scale_x_continuous("Cross-Correlation") + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Cross Correlation")
+```
+### Rough Correlation
+
+```{r}
+ggplot(data = features, aes(x = rough_cor)) + 
+  geom_histogram(color = "black") + 
+  scale_x_continuous("Rough Correlation") + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Rough Correlation")
+```
+### Sequence Distance
+
+```{r}
+ggplot(data = features, aes(x = D)) + 
+  geom_histogram(color = "black") + 
+  scale_x_continuous("Sequence Distance") + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Sequence Distance")
+```
+### Standard Deviation of Sequence Distance
+
+```{r}
+ggplot(data = features, aes(x = sd_D)) + 
+  geom_histogram(color = "black") + 
+  scale_x_continuous("Standard Deviation of Sequence Distance") + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Standard Deviation of Sequence Distance")
+```
+
+### Matches
+```{r}
+ggplot(data = features, aes(x = matches)) + 
+  geom_histogram(color = "black", binwidth = 1) + 
+  scale_x_continuous("Matches", breaks = c(0:5)*2) + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Matches")
+```
+
+### Mismatches
+```{r}
+ggplot(data = features, aes(x = mismatches)) + 
+  geom_histogram(color = "black", binwidth = 1) + 
+  scale_x_continuous("Mismatches", breaks = c(0:10)*2) + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Mismatches")
+```
+
+### Consecutive Matching Striae
+
+```{r}
+features %>%
+  ggplot(aes(x = cms)) + 
+  geom_histogram(color = 'black', binwidth = 1) + 
+  scale_x_continuous("Maximum number of Consecutive Matching Striae", breaks = c(0:5) * 2) + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Maximum Consecutive Matching Striae")
+```
+
+### Nonconsecutive Matching Striae
+
+
+```{r}
+features %>%
+  ggplot(aes(x = non_cms)) + 
+  geom_histogram(color = 'black', binwidth = 1) + 
+  scale_x_continuous("Nonconsecutive Matching Striae", breaks = c(0:10) * 2) + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Nonconsecutive Matching Striae")
+```
+
+### Sum of Peaks
+
+
+```{r}
+features %>%
+  ggplot(aes(x = sum_peaks)) + 
+  geom_histogram(color = 'black') + 
+  scale_x_continuous("Sum of Aligned Striae") + 
+  ylab("Number of Sequences") + 
+  ggtitle("Null Distribution of Sum of Aligned Striae")
+```

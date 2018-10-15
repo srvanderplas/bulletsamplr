@@ -1,12 +1,31 @@
 ---
-title: "bulletsamplr"
-author: "Susan VanderPlas"
-date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{bulletsamplr}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+title: Threshold Bootstrap for Land Engraved Area Signatures
+
+# to produce blinded version set to 1
+blinded: 0
+
+authors: 
+- name: Susan VanderPlas
+  thanks: The authors gratefully acknowledge XXX NIST funding for CSAFE
+  affiliation: Department of Statistics, Iowa State University
+  
+keywords:
+- 3 to 6 keywords
+- that do not appear in the title
+
+abstract: |
+  
+bibliography: refs
+biblio-style: apsr
+
+output: 
+  pdf_document:
+    citation_package: natbib
+    keep_tex: true
+    fig_caption: true
+    latex_engine: pdflatex
+    template: template.tex
+
 ---
 
 ```{r setup, include = FALSE}
@@ -18,6 +37,20 @@ knitr::opts_chunk$set(
 
 
 # Introduction
+
+A common question in forensics (whether statistical or examiner based) is the error rate of the assessment procedure. The term ``error rate'' includes the statistical concepts of false positives (declaring a match when the two pieces of evidence are from different sources) and false negatives (declaring that two pieces are from different sources when they are from the same source). Statistical methods for forensic comparisons take the following form: 
+
+1. Reduce the evidence to some set of numeric data used for comparison
+2. Use the numeric data to calculate a match score
+3. Compare the match score to reference distributions derived from known matches (KM) and known non matches (KNM)
+4. Calculate a score-based likelihood ratio[@lund_likelihood_2017] for a known match: $$LR(KM) = \frac{\text{Probability of observing }x | \text { known match}}{\text{Probability of observing }x | \text{ known non match}}$$
+
+Derivation of this likelihood ratio depends heavily on the reference distributions derived from known matches and known non matches. 
+
+In order to present evidence in court, it is particularly important to assess false positive rate (the probability of declaring a match when the data are from different sources). For score-based problems, the false positive rate is tied to the quality of the estimate of the denominator above, that is, the probability of observing $x$ when it is known that the two pieces of evidence are from different sources. It is generally impractical to derive this probability experimentally - one would need to compare very large amounts of data from different sources stemming from the population of interest; for bullet comparisons, for instance, it would be necessary to gather bullets fired from a large number of barrels with class characteristics similar to those referenced, compare each fired bullet to each other bullet, and determine the number of bullets which have a score greater than $x$ observed score. 
+
+It is much more reasonable to statistically derive the distribution of scores under known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. 
+
 
 ## Null Distributions in Forensic Statistics
 

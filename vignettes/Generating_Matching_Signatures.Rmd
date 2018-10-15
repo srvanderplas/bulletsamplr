@@ -1,0 +1,64 @@
+---
+title: "Generate Matching Signatures"
+author: "Susan VanderPlas"
+date: "10/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r env-setup}
+library(dplyr)
+library(odbc)
+library(bulletsamplr)
+library(bulletxtrctr)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+
+con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
+```
+
+## Question: Is it possible to generate threshold bootstrap samples to produce matching sequences?
+
+```{r}
+barrel10 <- tbl(con, "bullet.crosssection") %>%
+  filter(Barrel == "10") %>%
+  collect()
+
+barrel10 <- barrel10 %>% group_by(Study, Barrel, Bullet, Land, id, source) %>%
+  nest(x, y, value, sig, .key = 'ccdata') %>%
+  ungroup()
+
+barrel10align <- purrr::map2_df(1, 2:36, function(.x, .y) {
+  x <- barrel10[.x,]
+  y <- barrel10[.y,]
+  xname <- paste(x$Study, x$id, sep = "_")
+  yname <- paste(y$Study, y$id, sep = "_")
+  tmp <- sig_align(x$ccdata[[1]]$sig, y$ccdata[[1]]$sig)
+  tmp$lands <- tmp$lands %>%
+    mutate(x = x - (tmp$lag + 1)) %>%
+    magrittr::set_names(c("x", xname, yname))
+  data_frame(b1 = xname,
+             b2 = yname,
+             ccf = tmp$ccf,
+             lag = tmp$lag,
+             lands = list(tmp$lands))
+})
+
+full_join_all <- function(lx, by = NULL) {
+  if (length(lx) == 1) {
+    lx[[1]]
+  } else {
+    full_join(lx[[1]], full_join_all(lx[-1], by = by))
+  }
+}
+
+all_aligned <- full_join_all(barrel10align$lands, by = c("x", "Hamby36_10-1-1"))
+all_aligned <- all_aligned %>% arrange(x) %>%
+  gather(key = set, value = value, -x)
+
+ggplot(all_aligned, aes(x = x, y = value)) + geom_line() + facet_wrap(~set)
+```
