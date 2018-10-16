@@ -49,7 +49,7 @@ Derivation of this likelihood ratio depends heavily on the reference distributio
 
 In order to present evidence in court, it is particularly important to assess false positive rate (the probability of declaring a match when the data are from different sources). For score-based problems, the false positive rate is tied to the quality of the estimate of the denominator above, that is, the probability of observing $x$ when it is known that the two pieces of evidence are from different sources. It is generally impractical to derive this probability experimentally - one would need to compare very large amounts of data from different sources stemming from the population of interest; for bullet comparisons, for instance, it would be necessary to gather bullets fired from a large number of barrels with class characteristics similar to those referenced, compare each fired bullet to each other bullet, and determine the number of bullets which have a score greater than $x$ observed score. 
 
-It is much more reasonable to statistically derive the distribution of scores under known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. 
+It is much more reasonable to statistically derive the distribution of scores under known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. 
 
 
 ## Null Distributions in Forensic Statistics
