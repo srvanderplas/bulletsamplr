@@ -6,7 +6,7 @@ blinded: 0
 
 authors: 
 - name: Susan VanderPlas
-  thanks: The authors gratefully acknowledge XXX NIST funding for CSAFE
+  thanks: This work was partially funded by the Center for Statistics and Applications in Forensic Evidence (CSAFE) through Cooperative Agreement \#70NANB15H176 between NIST and Iowa State University, which includes activities carried out at Carnegie Mellon University, University of California Irvine, and University of Virginia.
   affiliation: Department of Statistics, Iowa State University
   
 keywords:
@@ -45,14 +45,11 @@ A common question in forensics (whether statistical or examiner based) is the er
 3. Compare the match score to reference distributions derived from known matches (KM) and known non matches (KNM)
 4. Calculate a score-based likelihood ratio[@lund_likelihood_2017] for a known match: $$LR(KM) = \frac{\text{Probability of observing }x | \text { known match}}{\text{Probability of observing }x | \text{ known non match}}$$
 
-Derivation of this likelihood ratio depends heavily on the reference distributions derived from known matches and known non matches. 
+Derivation of this likelihood ratio depends heavily on the reference distributions derived from known matches and known non matches. These reference distributions are assembled from collected data, which may be sparse for a given set of class characteristics (firearm, barrel manufacturing process, ammunition type). 
 
 In order to present evidence in court, it is particularly important to assess false positive rate (the probability of declaring a match when the data are from different sources). For score-based problems, the false positive rate is tied to the quality of the estimate of the denominator above, that is, the probability of observing $x$ when it is known that the two pieces of evidence are from different sources. It is generally impractical to derive this probability experimentally - one would need to compare very large amounts of data from different sources stemming from the population of interest; for bullet comparisons, for instance, it would be necessary to gather bullets fired from a large number of barrels with class characteristics similar to those referenced, compare each fired bullet to each other bullet, and determine the number of bullets which have a score greater than $x$ observed score. 
 
-It is much more reasonable to statistically derive the distribution of scores under known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. 
-
-
-## Null Distributions in Forensic Statistics
+It is much more reasonable to statistically derive the distribution of scores under known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. Other data generation and augmentation techniques have been used for handwriting data \citep{sesa-nogueras_writer_2013, rabasse_new_2008}, iris data\citep{wecker_multiresolution_2010}, and facial images \citep{leibe_we_2016}. With generated data, we can be reasonably certain that any correspondance between two generated patterns is entirely random. As long as important characteristics of the data are preserved, these random pattern data provide a much quicker process to assess the distribution of known non-matching pattern scores.  
 
 ## Threshold Bootstrap
 
