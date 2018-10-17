@@ -17,6 +17,9 @@ library(bulletxtrctr)
 library(ggplot2)
 library(stringr)
 library(tidyr)
+library(purrr)
+library(furrr)
+plan(multicore)
 
 con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
 ```
@@ -32,15 +35,49 @@ barrel10 <- barrel10 %>% group_by(Study, Barrel, Bullet, Land, id, source) %>%
   nest(x, y, value, sig, .key = 'ccdata') %>%
   ungroup()
 
-barrel10align <- purrr::map2_df(1, 2:36, function(.x, .y) {
-  x <- barrel10[.x,]
-  y <- barrel10[.y,]
+ccdata_align <- function(ccd1, ccd2) {
+  sig_align(ccd1$sig, ccd2$sig)
+}
+
+barrel10combo <- tidyr::crossing(barrel10, barrel10) %>%
+  # filter(Study != Study1) %>%
+  mutate(align = purrr::map2(ccdata, ccdata1, ccdata_align))
+
+barrel10combo <- barrel10combo %>%
+  mutate(ccf = sapply(align, function(.) .$ccf),
+         lag = sapply(align, function(.) .$lag))
+
+barrel10combo %>%
+  mutate_at(vars(matches("id")), ~str_remove(., "10-\\d-")) %>%
+ggplot(aes(x = id, y = id1, fill = ccf)) + 
+  geom_tile() + facet_grid(Study1 + Bullet1 ~ Study + Bullet) + 
+  scale_fill_gradient2(low = "gray", high = "darkorange", mid = "white", midpoint = .5) + 
+  ggtitle("Barrel 10, Bullet 1 & 2, across 3 Hamby studies") + 
+  coord_fixed() + 
+  theme(axis.title = element_blank())
+```
+
+Examining all sequences which align with Barrel 10, Bullet 1, Land 3 of Hamby 224 (10-2-5 from Hamby 224; 10-1-6, 10-2-6 from Hamby 36; 10-1-1, 10-2-1 from Hamby44), we see substantial correspondance between the signatures. 
+```{r}
+b10sub <- barrel10 %>%
+  filter((Study == "Hamby224" & id %in% c("10-1-3", "10-2-5")) | 
+           (Study == "Hamby36" & id %in% c("10-1-6", "10-2-6")) | 
+           (Study == "Hamby44Rescan" & id %in% c("10-1-1", "10-2-1"))) %>%
+  mutate(ref = paste(Study, id, sep = "_"))
+
+barrel10_l1_align <- purrr::map2_df(1, 2:6, function(.x, .y) {
+  x <- b10sub[.x,]
+  y <- b10sub[.y,]
   xname <- paste(x$Study, x$id, sep = "_")
   yname <- paste(y$Study, y$id, sep = "_")
   tmp <- sig_align(x$ccdata[[1]]$sig, y$ccdata[[1]]$sig)
   tmp$lands <- tmp$lands %>%
-    mutate(x = x - (tmp$lag + 1)) %>%
     magrittr::set_names(c("x", xname, yname))
+  
+  if (is.na(tmp$lands[1,xname])) {
+    tmp$lands$x <- tmp$lands$x - which.min(is.na(tmp$lands[,xname])) + 1
+  }
+  
   data_frame(b1 = xname,
              b2 = yname,
              ccf = tmp$ccf,
@@ -52,13 +89,283 @@ full_join_all <- function(lx, by = NULL) {
   if (length(lx) == 1) {
     lx[[1]]
   } else {
-    full_join(lx[[1]], full_join_all(lx[-1], by = by))
+    full_join(lx[[1]], full_join_all(lx[-1], by = by), by = by)
   }
 }
 
-all_aligned <- full_join_all(barrel10align$lands, by = c("x", "Hamby36_10-1-1"))
-all_aligned <- all_aligned %>% arrange(x) %>%
-  gather(key = set, value = value, -x)
+all_aligned <- full_join_all(barrel10_l1_align$lands, by = c("x", b10sub$ref[1])) %>% arrange(x)
+all_aligned_long <- all_aligned %>%
+  gather(key = id, value = value, -x) %>%
+  extract(id, into = c("set", "Barrel", "Bullet", "Land"), regex = "(.*)_(\\d{2})-(\\d)-(\\d)", remove = F)
 
-ggplot(all_aligned, aes(x = x, y = value)) + geom_line() + facet_wrap(~set)
+med_aligned <- all_aligned_long %>%
+  group_by(x) %>%
+  summarize(value = median(value, na.rm = T))
+
+med_all <- all_aligned_long %>%
+  group_by(id, set, Barrel, Bullet, Land) %>%
+  summarize(value = median(value, na.rm = T))
+
+ggplot(all_aligned_long, aes(x = x, y = value, color = id)) + 
+  geom_line() + 
+  # geom_hline(aes(yintercept = value, color = id), data = med_all) + 
+  geom_line(aes(x = x, y = value, color = NA), data = med_aligned) + 
+  facet_grid(set + Bullet~., labeller = label_both) +
+  scale_color_discrete(na.value = 'grey', guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Hamby Barrel 10 Bullets")
+```
+
+However, the cycle crossings from these sequences are somewhat different:
+
+```{r}
+cycle_aligned <- all_aligned_long %>% 
+  rename(sig = value) %>%
+  select(id, set, Barrel, Bullet, Land, x, sig) %>%
+  mutate(xold = x, sigold = sig) %>%
+  split(.$id) %>%
+  purrr::map_df(., ~crosscut_slice(.) %>% bind_rows())
+  
+cycle_aligned <- cycle_aligned %>% 
+  group_by(id, .chunk) %>% 
+  mutate(chunksplit = (row_number() == 1 & .chunk != 0)) %>%
+  ungroup()
+
+cycle_aligned_split <- cycle_aligned %>%
+  filter(chunksplit) %>%
+  mutate(xold = xold - .5)
+
+
+ggplot(data = cycle_aligned, aes(x = xold, y = sigold, color = id, group = .chunk)) + 
+  geom_line() + 
+  geom_line(aes(x = x, y = value, color = NA), data = med_aligned, inherit.aes = F) + 
+  geom_vline(aes(xintercept = xold), color = "black", data = cycle_aligned_split) + 
+  facet_grid(set + Bullet~., labeller = label_both) +
+  scale_color_discrete(na.value = 'grey', guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Hamby Barrel 10 Bullets")
+```
+
+In several locations (e.g. around 440, 660, 950, 1130, 1350, 1500, 2030, 2325, 2475, 2600) there are common splits that occur in most of the sequences. There are also natural variations that occur due to the median value being slightly different for each sequence, causing splits (or lack thereof) at certain striae that are not replicated in other sequences (Hamby36, Bullet 2 has several of these; also at ~1650 there are some sequences that have a split and others that do not even though all sequences are fairly similar in this area). 
+
+It may be possible to bootstrap matching sequences by aligning sequences and storing their deviation from the assembled median sequence, then utilizing the deviations to construct several "matching" sequences. This would depend on the distribution of errors around the median sequence. 
+
+```{r}
+
+aligned_dev <- left_join(all_aligned, rename(med_aligned, med = value)) %>%
+  mutate(med = ifelse(rowSums(is.na(.)) > 3, NA, med)) %>%
+  gather(key = id, value = value, -x, -med) %>%
+  extract(id, into = c("set", "Barrel", "Bullet", "Land"), regex = "(.*)_(\\d{2})-(\\d)-(\\d)", remove = F) %>%
+  mutate(dev = value - med)
+
+ggplot(aligned_dev, aes(x = x, y = dev, color = id)) + 
+  geom_line() + 
+  # geom_hline(aes(yintercept = value, color = id), data = med_all) + 
+  geom_line(aes(x = x, y = value), color = "black", data = med_aligned) + 
+  # facet_grid(set + Bullet~., labeller = label_both) +
+  scale_color_discrete(na.value = 'grey', guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Hamby Barrel 10 Residuals vs. Median Signature")
+
+ggplot(aligned_dev, aes(x = med, y = dev, color = x)) + 
+  geom_path() + 
+  facet_wrap(~id) + 
+  xlab("Median Signature Value") + 
+  ylab("Residual Signature Value")
+```
+
+There's a fairly weak correlation between the median sequence value and the residual values for each sequence. Given that the median was used as a smoothing line, it isn't unexpected that the correlations are centered around 0, but at best we see a correlation with absolute magnitude around 0.3.
+
+It's obvious that there is significant autocorrelation for each individual sequence, though. 
+```{r}
+aligned_dev %>%
+  group_by(id) %>%
+  summarize(cor = cor(med, dev, use = 'complete.obs'))
+
+aligned_corr <- aligned_dev %>%
+  crossing(., .) %>%
+  group_by(id, id1) %>%
+  summarize(crosscor = cor(dev, dev1),
+            medcor = cor(med, dev, use = 'complete.obs'),
+            cor = ifelse(id == id1, medcor, crosscor)) 
+```
+
+
+```{r}
+# Functions to align all lands 
+barrel_setup <- function(i, land_equiv, con) {
+  barrel <- sprintf("%02d", i)
+  barrelquery <- c(barrel, sprintf("% 2d", i), sprintf("%d", i)) %>% unique()
+  
+  crossing(
+    data_frame(Study = c("Hamby224", "Hamby36", "Hamby44Rescan")),
+    data_frame(Bullet = c("1-", "2-"))) %>%
+  mutate(Barrel = str_pad(as.character(i), width = 2, pad = ifelse(Study == "Hamby224", " ", "0")),
+         id = paste0(Barrel, "-", Bullet)) %>%
+  mutate(start_at = land_equiv) %>%
+  crossing(data_frame(land = -1:4, letter = letters[1:6])) %>%
+  mutate(land = (land + start_at) %% 6 + 1)  %>%
+  mutate(id = paste0(id, land)) %>%
+  arrange(letter) %>%
+  select(-start_at, -land, -Barrel, -Bullet) %>%
+  left_join(
+    tbl(con, "bullet.crosssection") %>%
+      filter(Barrel %in% barrelquery) %>%
+      collect()
+  ) %>%
+  mutate(ref = paste(Study, id, sep = "_")) %>%
+    group_by(ref) %>%
+    mutate(allNA = sum(!is.na(sig))) %>%
+    ungroup() %>%
+    filter(allNA > 0)
+}
+
+barrel_align <- function(x, y) {
+    xname <- unique(x$ref)
+    yname <- unique(y$ref)
+    tmp <- sig_align(x$sig, y$sig)
+    tmp$lands <- tmp$lands %>%
+      magrittr::set_names(c("x", xname, yname))
+    
+    if (is.na(tmp$lands[1,xname])) {
+      tmp$lands$x <- tmp$lands$x - which.min(is.na(tmp$lands[,xname])) + 1
+    }
+    
+    data_frame(b1 = xname,
+               b2 = yname,
+               ccf = tmp$ccf,
+               lag = tmp$lag,
+               lands = list(tmp$lands))
+}
+
+barrel_cross <- function(df) {
+  df %>%
+    select(-Barrel, -Bullet, -Land, -source) %>%
+    nest(-Study, -id, -letter) %>%
+    crossing(., .) %>%
+    filter(letter == letter1) %>%
+    group_by(letter) %>%
+    filter(!(Study == Study1 & id == id1)) %>% # Same data comparisons
+    filter(id == id[1]) # Get only one set of comparisons for each matching land
+}
+
+barrel_cross_align <- function(df) {
+  df %>% 
+    barrel_cross() %>%
+    mutate(align = future_map2(data, data1, barrel_align))
+}
+
+full_join_all <- function(lx, by = NULL) {
+  if (length(lx) == 1) {
+    lx[[1]]
+  } else {
+    full_join(lx[[1]], full_join_all(lx[-1], by = by), by = by)
+  }
+}
+
+plot_aligned_seq <- function(letter, long, med) {
+  barrel <- unique(long$Barrel)
+  
+  long <- long %>%
+    mutate(set = str_replace_all(set, "[^\\d]", "")) %>%
+    mutate(fac = sprintf("Set%s-%s", set, Bullet)) %>%
+    mutate(fac_id = factor(fac) %>% as.numeric())
+
+  suppressWarnings({
+    ggplot(long, aes(x = x, y = sig, color = factor(fac_id))) + 
+      geom_line() + 
+      geom_line(aes(x = x, y = med, color = NA), data = med) + 
+      # facet_grid(fac~., labeller = label_both) +
+      scale_color_discrete(na.value = 'grey', guide = F) + 
+      theme(axis.title = element_blank()) + 
+      ggtitle(sprintf("Hamby Barrel %02s Bullets, Land Set %s", barrel, letter))
+  })
+}
+```
+
+```{r}
+res <- as.list(1:10)
+con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
+res[[1]] <- barrel_setup(1, c(1, 6, 3, 6, 6, 4), con = con)
+res[[2]] <- barrel_setup(2, c(1, 6, 6, 6, 3, 5), con = con)
+res[[3]] <- barrel_setup(3, c(1, 3, 5, 5, 2, 2), con = con)
+res[[4]] <- barrel_setup(4, c(1, 6, 6, 6, 1, 5), con = con)
+res[[5]] <- barrel_setup(5, c(1, 5, 2, 5, 5, 6), con = con)
+res[[6]] <- barrel_setup(6, c(1, 4, 4, 4, 3, 3), con = con) # Really good matches
+res[[7]] <- barrel_setup(7, c(1, 2, 2, 2, 1, 3), con = con)
+res[[8]] <- barrel_setup(8, c(1, 5, 1, 2, 6, 3), con = con)
+res[[9]] <- barrel_setup(9, c(1, 5, 1, 1, 2, 5), con = con)
+res[[10]] <- barrel_setup(10, c(1, 3, 4, 4, 5, 5), con = con)
+
+res_align <- map(res, barrel_cross_align)
+res_align <- res_align %>% bind_rows() %>%
+  mutate(Barrel = id %>% str_extract("^ ?\\d{1,}") %>% as.numeric())
+
+res_align_joined <- res_align %>%
+  unnest(align) %>%
+  select(-data, -data1, -letter1) %>%
+  group_by(Barrel, letter) %>%
+  summarize(lands = list(full_join_all(lands)))
+
+res_align_plotable <- res_align_joined %>%
+  mutate(longalign = map(lands, gather, key = id, value = sig, -x),
+         longalign = map(longalign, extract, col = id, 
+                         into = c("set", "Barrel", "Bullet", "Land"), 
+                         regex = "(.*)_([ \\d]{2})-(\\d)-(\\d)", remove = F)
+         ) %>%
+  select(-lands) %>%
+  unnest() %>%
+  group_by(Barrel, letter) %>%
+  mutate(line_id = factor(id) %>% as.numeric()) %>%
+  ungroup() %>%
+  mutate(LandSet = letter)
+
+res_align_plotable_med <- res_align_plotable  %>%
+  group_by(Barrel, LandSet, x) %>%
+  summarize(
+    n_not_na = sum(!is.na(sig)),
+    med = ifelse(n_not_na >= 3, median(sig, na.rm = T), NA)
+  ) %>%
+  filter(n_not_na >= 3)
+
+res_align_cycle <- res_align_plotable %>% 
+  select(Barrel, LandSet, letter, id, line_id, set, x, sig) %>%
+  mutate(xold = x, sigold = sig) %>%
+  split(.$id) %>%
+  purrr::map_df(., ~crosscut_slice(.) %>% bind_rows())
+  
+res_align_cycle_split <- res_align_cycle %>% 
+  group_by(id, .chunk) %>% 
+  mutate(chunksplit = (row_number() == 1 & .chunk != 0)) %>%
+  ungroup() %>%
+  filter(chunksplit) %>%
+  mutate(xold = xold - .5)
+
+```
+
+```{r, fig.width = 12, fig.height = 15}
+ggplot() + 
+  theme_bw() +
+  geom_line(aes(x = x, y = sig, color = factor(line_id)), data = res_align_plotable) + 
+  geom_line(aes(x = x, y = med), color = 'grey30', data = res_align_plotable_med) + 
+  facet_grid(Barrel~LandSet, labeller = label_both) +
+  coord_cartesian(ylim = c(-5, 5)) + 
+  scale_color_discrete(guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Hamby Sets 36, 44, 224 Aligned")
+
+```
+
+```{r, fig.width = 12, fig.height = 15}
+
+ggplot() + 
+  theme_bw() +
+  facet_grid(Barrel~LandSet, labeller = label_both) +
+  coord_cartesian(ylim = c(-5, 5)) + 
+  geom_line(aes(x = x, y = sig, color = factor(line_id)), data = res_align_plotable) + 
+  geom_line(aes(x = x, y = med), color = 'grey30', data = res_align_plotable_med) + 
+  geom_vline(aes(xintercept = xold, color = factor(line_id)), data = res_align_cycle_split) + 
+  scale_color_discrete(na.value = 'grey', guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Hamby Barrel 10 Bullets")
 ```
