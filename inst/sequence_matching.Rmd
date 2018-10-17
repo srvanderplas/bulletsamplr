@@ -14,6 +14,8 @@ library(bulletxtrctr)
 library(ggplot2)
 library(stringr)
 library(tidyr)
+library(furrr)
+plan(multicore, workers = 20)
 
 con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
 
@@ -24,7 +26,7 @@ The peak db is made up of peaks from three Hamby sets. Thus, the random match pr
 
 ```{r}
 barrel10 <- tbl(con, "bullet.crosssection") %>%
-  filter(Barrel == "10" & Bullet == 1) %>%
+  filter(Barrel == "10") %>%
   collect()
 
 barrel10 <- barrel10 %>% group_by(Study, Barrel, Bullet, Land, id, source) %>%
@@ -43,19 +45,21 @@ barrel10combo <- barrel10combo %>%
   mutate(ccf = sapply(align, function(.) .$ccf),
          lag = sapply(align, function(.) .$lag))
 barrel10combo %>%
-  mutate_at(vars(matches("id")), ~str_remove(., "10-")) %>%
+  mutate_at(vars(matches("id")), ~str_remove(., "10-\\d-")) %>%
 ggplot(aes(x = id, y = id1, fill = ccf)) + 
-  geom_tile() + facet_grid(Study1 ~ Study) + 
+  geom_tile() + facet_grid(Study1 + Bullet1 ~ Study + Bullet) + 
   scale_fill_gradient2(low = "gray", high = "darkorange", mid = "white", midpoint = .5) + 
-  ggtitle("Barrel 10, Bullet 1 across 3 Hamby studies")
+  ggtitle("Barrel 10, Bullet 1 & 2, across 3 Hamby studies") + 
+  coord_fixed() + 
+  theme(axis.title = element_blank())
 
 ```
 
-Examining all chunks from Barrel 10, Bullet 1 of three Hamby studies (36, 44, 224), we see that 
+Examining all sequences which align with Barrel 10, Bullet 1, Land 1 of Hamby 224 (10-2-3 from Hamby 224; 10-1-4, 10-2-4 from Hamby 36; 10-1-5, 10-2-5 from Hamby44), we see:
 ```{r}
 db <- tbl(con, "bullet.slice") %>%
   collect() %>%
-  filter(str_detect(id, "(.*)_10-1-._..")) 
+  filter(str_detect(id, "(.*)_10-.-._..")) 
 
 db10 <- db %>%
   mutate(chunk = str_extract(id, "\\d{2}$") %>% as.numeric(),
@@ -118,7 +122,7 @@ sig_align_abs <- function(sig1, sig2) {
 }
 
 db10combo <- tidyr::crossing(db10, db10) %>%
-  mutate(ccf = purrr::map2(data, data1, ~sig_align_abs(.x$sig, .y$sig)))
+  mutate(ccf = furrr::future_map2(data, data1, ~sig_align_abs(.x$sig, .y$sig)))
 
 db10combo$ccf_only <- sapply(db10combo$ccf, function(x) x$ccf)
 db10combo$ccf_lag <- sapply(db10combo$ccf, function(x) x$lag)
