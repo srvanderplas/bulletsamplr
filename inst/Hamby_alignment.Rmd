@@ -69,36 +69,7 @@ match_all_studies <- function(i, con) {
 # 
 # saveRDS(res, file = "inst/Hamby_Known_Aligned.rda")
 
-res <- loadRDS("inst/Hamby_Known_Aligned.rda")
+res <- readRDS("Hamby_Known_Aligned.rda")
 purrr::map(res, plot_align_multistudy)
 ```
 
-```{r}
-
-barrel_setup <- function(i, land_equiv, con) {
-  barrel <- sprintf("%02d", i)
-  barrelquery <- c(barrel, sprintf("% 2d", i), sprintf("%d", i))
-  
-  crossing(
-    data_frame(Study = c("Hamby224", "Hamby36", "Hamby44Rescan")),
-    data_frame(Barrel = barrel, Bullet = c("1-", "2-"))) %>%
-  mutate(Barrel = ifelse(Study == "Hamby224", sprintf("% 2d", i), Barrel),
-         id = paste0(Barrel, "-", Bullet)) %>%
-  mutate(start_at = land_equiv) %>%
-  crossing(data_frame(land = -1:4, letter = letters[1:6])) %>%
-  mutate(land = (land + start_at) %% 6 + 1)  %>%
-  mutate(id = paste0(id, land)) %>%
-  arrange(letter) %>%
-  select(-start_at, -land, -Barrel, -Bullet) %>%
-  left_join(
-    tbl(con, "bullet.crosssection") %>%
-      filter(Barrel %in% barrelquery) %>%
-      collect()
-  ) %>%
-  mutate(ref = paste(Study, id, sep = "_"))
-}
-
-con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
-barrel_setup(1, c(1, 6, 3, 6, 6, 4), con = con)
-
-```
