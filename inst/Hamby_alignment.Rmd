@@ -1,0 +1,104 @@
+---
+title: "Hamby Alignment"
+author: "Susan VanderPlas"
+date: "10/17/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r env-setup}
+library(dplyr)
+library(odbc)
+library(bulletsamplr)
+library(bulletxtrctr)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(purrr)
+library(furrr)
+plan(multicore)
+
+ccdata_align <- function(ccd1, ccd2) {
+  sig_align(ccd1$sig, ccd2$sig)
+}
+```
+
+```{r}
+plot_align_multistudy <- function(df) {
+  i <- unique(df$Barrel) %>% as.numeric()
+  plot_title <- sprintf("Barrel %02d, Bullet 1 & 2, across 3 Hamby studies", i)
+  df %>%
+    ggplot(aes(x = Land, y = Land1, fill = ccf)) + 
+    geom_tile() + facet_grid(Study1 + Bullet1 ~ Study + Bullet) + 
+    scale_fill_gradient2(low = "gray", high = "darkorange", mid = "white", midpoint = .5) + 
+    ggtitle(plot_title) + 
+    coord_fixed() + 
+    theme(axis.title = element_blank())
+}
+
+res <- c(1:10) %>% as.list()
+match_all_studies <- function(i, con) {
+  barrel <- sprintf(c("%d", "%02d"), i)
+  barrel <- tbl(con, "bullet.crosssection") %>%
+    filter(Barrel %in% barrel) %>%
+    collect()
+  
+  barrel <- barrel %>% group_by(Study, Barrel, Bullet, Land, id, source) %>%
+    nest(x, y, value, sig, .key = 'ccdata') %>%
+    ungroup()
+  
+  barrel_align <- tidyr::crossing(barrel, barrel) %>%
+    filter(!(Study == Study1 & Bullet == Bullet1)) %>%
+    mutate(align = furrr::future_map2(ccdata, ccdata1, ccdata_align))
+  
+  barrel_align <- barrel_align %>%
+    mutate(ccf = sapply(align, function(.) .$ccf),
+           lag = sapply(align, function(.) .$lag))
+  
+  res[[i]] <<- barrel_align
+  
+  plot_align_multistudy(barrel_align, i)
+}
+
+# con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
+# map(1:10, match_all_studies, con = con)
+# dbDisconnect(con)
+# 
+# saveRDS(res, file = "inst/Hamby_Known_Aligned.rda")
+
+res <- loadRDS("inst/Hamby_Known_Aligned.rda")
+purrr::map(res, plot_align_multistudy)
+```
+
+```{r}
+
+barrel_setup <- function(i, land_equiv, con) {
+  barrel <- sprintf("%02d", i)
+  barrelquery <- c(barrel, sprintf("% 2d", i), sprintf("%d", i))
+  
+  crossing(
+    data_frame(Study = c("Hamby224", "Hamby36", "Hamby44Rescan")),
+    data_frame(Barrel = barrel, Bullet = c("1-", "2-"))) %>%
+  mutate(Barrel = ifelse(Study == "Hamby224", sprintf("% 2d", i), Barrel),
+         id = paste0(Barrel, "-", Bullet)) %>%
+  mutate(start_at = land_equiv) %>%
+  crossing(data_frame(land = -1:4, letter = letters[1:6])) %>%
+  mutate(land = (land + start_at) %% 6 + 1)  %>%
+  mutate(id = paste0(id, land)) %>%
+  arrange(letter) %>%
+  select(-start_at, -land, -Barrel, -Bullet) %>%
+  left_join(
+    tbl(con, "bullet.crosssection") %>%
+      filter(Barrel %in% barrelquery) %>%
+      collect()
+  ) %>%
+  mutate(ref = paste(Study, id, sep = "_"))
+}
+
+con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
+barrel_setup(1, c(1, 6, 3, 6, 6, 4), con = con)
+
+```
