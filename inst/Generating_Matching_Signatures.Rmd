@@ -24,7 +24,12 @@ plan(multicore)
 con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
 ```
 
-## Question: Is it possible to generate threshold bootstrap samples to produce matching sequences?
+# Question: Is it possible to generate threshold bootstrap samples to produce matching sequences?
+
+
+## Barrel 10
+
+Examining the alignment of 6 sequences (2 bullets, 3 Hamby Studies) which match. All sequences are from Barrel 10. 
 
 ```{r}
 barrel10 <- tbl(con, "bullet.crosssection") %>%
@@ -57,7 +62,7 @@ ggplot(aes(x = id, y = id1, fill = ccf)) +
   theme(axis.title = element_blank())
 ```
 
-Examining all sequences which align with Barrel 10, Bullet 1, Land 3 of Hamby 224 (10-2-5 from Hamby 224; 10-1-6, 10-2-6 from Hamby 36; 10-1-1, 10-2-1 from Hamby44), we see substantial correspondance between the signatures. 
+All sequences align with Barrel 10, Bullet 1, Land 3 of Hamby 224 (10-2-5 from Hamby 224; 10-1-6, 10-2-6 from Hamby 36; 10-1-1, 10-2-1 from Hamby44). There is substantial correspondance between the signatures. 
 ```{r}
 b10sub <- barrel10 %>%
   filter((Study == "Hamby224" & id %in% c("10-1-3", "10-2-5")) | 
@@ -191,6 +196,8 @@ aligned_corr <- aligned_dev %>%
 ```
 
 
+## All Barrels from 3 Hamby Studies
+
 ```{r}
 # Functions to align all lands 
 barrel_setup <- function(i, land_equiv, con) {
@@ -301,13 +308,11 @@ res_align <- map(res, barrel_cross_align) %>%
   bind_rows() %>%
   mutate(Barrel = id %>% str_extract("^ ?\\d{1,}") %>% as.numeric())
 
-res_align_joined <- res_align %>%
+res_align_plotable <- res_align %>%
   unnest(align) %>%
   select(-data, -data1, -letter1) %>%
   group_by(Barrel, letter) %>%
-  summarize(lands = list(full_join_all(lands)))
-
-res_align_plotable <- res_align_joined %>%
+  summarize(lands = list(full_join_all(lands))) %>%
   mutate(
     longalign = map(lands, gather, key = id, value = sig, -x),
     longalign = map(longalign, extract, col = id, 
@@ -321,21 +326,34 @@ res_align_plotable <- res_align_joined %>%
   ungroup() %>%
   mutate(LandSet = letter)
 
+# Median/mean data only - smaller than long form, easier to plot single line
 res_align_plotable_med <- res_align_plotable  %>%
   group_by(Barrel, LandSet, x) %>%
   summarize(
     n_not_na = sum(!is.na(sig)),
-    med = ifelse(n_not_na >= 3, median(sig, na.rm = T), NA)
+    med = ifelse(n_not_na >= 3, median(sig, na.rm = T), NA),
+    mean = ifelse(n_not_na >= 3, mean(sig, na.rm = T), NA)
   ) %>%
-  filter(n_not_na >= 3)
+  filter(n_not_na >= 3) %>%
+  ungroup()
 
+# Intermediate dataset
 res_align_cycle <- res_align_plotable %>% 
   select(Barrel, LandSet, letter, id, line_id, set, x, sig) %>%
   mutate(xold = x, sigold = sig) %>%
   split(.$id) %>%
-  purrr::map_df(., ~crosscut_slice(.) %>% bind_rows())
+  purrr::map_df(., ~crosscut_slice(.) %>% bind_rows()) %>%
+  mutate(sig_cycle = sig, sig = sigold, x_cycle = x, x = xold)
+
+res_align_plotable <- left_join(res_align_plotable, res_align_cycle) %>%
+  left_join(res_align_plotable_med) %>%
+  mutate(dev = sig - mean)
+
+rm(res_align_cycle)
   
-res_align_cycle_split <- res_align_cycle %>% 
+# Cycle split points only
+res_align_cycle_split <- res_align_plotable %>% 
+  select(id, .chunk, xold, line_id, Barrel, LandSet) %>%
   group_by(id, .chunk) %>% 
   mutate(chunksplit = (row_number() == 1 & .chunk != 0)) %>%
   ungroup() %>%
@@ -344,11 +362,14 @@ res_align_cycle_split <- res_align_cycle %>%
 
 ```
 
-```{r, fig.width = 12, fig.height = 15}
+For each barrel, there are 6 sets of 6 lands each, with one land in each set from each of the bullet x study combinations. The land sets are indexed by a, b, c, d, e, and f, as specific land numbers vary from bullet to bullet and depend on the order in which they were scanned using the microscope. 
+
+For each land set x barrel combination, the alignments vary - the variability around the black mean line is very low for some (Land set A, Barrel 6) and generally high for others (Land set B, Barrel 1; Land set A, Barrel 8). There are also obvious cases where single lands do not align well due to tank rash, pitting, and other malformations (Barrel 8, Land set D, pink line; Barrel 3, Land set F, blue line). 
+```{r, fig.width = 24, fig.height = 15}
 ggplot() + 
   theme_bw() +
   geom_line(aes(x = x, y = sig, color = factor(line_id)), data = res_align_plotable) + 
-  geom_line(aes(x = x, y = med), color = 'grey30', data = res_align_plotable_med) + 
+  geom_line(aes(x = x, y = mean), color = 'grey30', data = res_align_plotable_med) + 
   facet_grid(Barrel~LandSet, labeller = label_both) +
   coord_cartesian(ylim = c(-5, 5)) + 
   scale_color_discrete(guide = F) + 
@@ -357,13 +378,13 @@ ggplot() +
 
 ```
 
-```{r, fig.width = 12, fig.height = 15}
+Examining the cycle breaks for these aligned sequences, we see the same correspondence noted when we examined Barrel 10 lands alone: many of the breaks line up across all lands, but each land also has several "unique" breaks that may reduce the chances of significant cross-correlation due to resampled pieces. 
+```{r, fig.width = 24, fig.height = 15}
 
 ggplot() + 
   theme_bw() +
   facet_grid(Barrel~LandSet, labeller = label_both) +
-  # geom_line(aes(x = x, y = sig/5 - line_id + 3.5, color = factor(line_id)), data = res_align_plotable) + 
-  geom_line(aes(x = x, y = med/4 + 6.5), color = 'grey60', data = res_align_plotable_med) + 
+  geom_line(aes(x = x, y = mean/4 + 7), color = 'grey60', data = res_align_plotable_med) + 
   geom_segment(aes(x = xold, xend = xold, y = line_id - 1, yend = line_id, 
                    color = factor(line_id)), data = res_align_cycle_split) + 
   scale_color_discrete(na.value = 'grey', guide = F) + 
@@ -371,3 +392,69 @@ ggplot() +
   theme(axis.title = element_blank(), axis.text.y = element_blank()) + 
   ggtitle("Cycle Breaks for Hamby Aligned LEAs")
 ```
+
+The peak deviations from the mean line do not appear to be obviously likely to occur at striae. 
+```{r, fig.width = 24, fig.height = 15}
+ggplot() + 
+  theme_bw() +
+  geom_line(aes(x = x, y = dev, color = factor(line_id)), data = res_align_plotable) + 
+  geom_line(aes(x = x, y = mean), color = 'grey30', data = res_align_plotable_med) + 
+  facet_grid(Barrel~LandSet, labeller = label_both) +
+  coord_cartesian(ylim = c(-5, 5)) + 
+  scale_color_discrete(guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Hamby Sets 36, 44, 224 Aligned - Residuals + Smoothed Line")
+```
+
+
+Examining whether the maximum and minimum of the residuals and the mean, respectively, taken over 100 values, are related produces no clear conclusions: 
+```{r, fig.width = 24, fig.height = 15}
+res_align_by100s <- res_align_plotable %>%
+  group_by(Barrel, LandSet, line_id, floor(x/100)) %>%
+  summarize(mean_max = suppressWarnings(max(mean, na.rm = T)), 
+            mean_min = suppressWarnings(min(mean, na.rm = T)), 
+            mean_na_num = sum(is.na(mean)),
+            dev_max = suppressWarnings(max(dev, na.rm = T)), 
+            dev_min = suppressWarnings(min(dev, na.rm = T)), 
+            dev_na_num = sum(is.na(dev))) %>%
+  filter_at(.vars = vars(matches("_(min|max)")), any_vars(is.finite(.))) %>%
+  mutate(mean_max = ifelse(mean_na_num <= 50, mean_max, NA),
+         mean_min = ifelse(mean_na_num <= 50, mean_min, NA),
+         dev_max = ifelse(dev_na_num <= 50, dev_max, NA),
+         dev_min = ifelse(dev_na_num <= 50, dev_min, NA))
+
+ggplot(res_align_by100s, aes(x = mean_max, y = dev_max, color = factor(line_id))) + 
+  theme_bw() +
+  geom_point(shape = 0) + 
+  geom_smooth(method = "lm", se = F) + 
+  facet_grid(Barrel~LandSet, labeller = label_both) +
+  # coord_cartesian(ylim = c(-5, 5)) + 
+  scale_color_discrete(guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Maximum value over 100 points")
+
+ggplot(res_align_by100s, aes(x = mean_min, y = dev_min, color = factor(line_id))) + 
+  theme_bw() +
+  geom_point(shape = 0) + 
+  geom_smooth(method = "lm", se = F) + 
+  facet_grid(Barrel~LandSet, labeller = label_both) +
+  # coord_cartesian(ylim = c(-5, 5)) + 
+  scale_color_discrete(guide = F) + 
+  theme(axis.title = element_blank()) + 
+  ggtitle("Minimum value over 100 points")
+
+
+```
+
+## Solution 
+
+One option for generating matching sequences is to process the aligned sequences in much the same way as the original sequences were processed to generate non-matching sequences from the original data, using the threshold bootstrap. 
+
+This process would require the following steps:
+
+1. Assemble the 'mean' sequence using the threshold bootstrap on assembled mean sequences
+2. Assemble one or more 'error' sequences using the residuals from assembled sequences
+3. Combine the 'mean' and 'error' sequences to produce sample matching scans
+4. Calculate features for each sample scans; compare between them to determine match strength
+
+As the mean and variance are independent, the sequences generated should also be independent. Generation of the mean and error sequences separately massively decreases the probability of assembling similar sequences coincidentally.  
