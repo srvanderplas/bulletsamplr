@@ -7,7 +7,7 @@
 [![CRAN
 status](https://www.r-pkg.org/badges/version/bulletsamplr)](https://cran.r-project.org/package=bulletsamplr)
 [![lifecycle](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
-[![Last-changedate](https://img.shields.io/badge/last%20change-2018--10--11-yellowgreen.svg)](/commits/master)
+[![Last-changedate](https://img.shields.io/badge/last%20change-2018--10--22-yellowgreen.svg)](/commits/master)
 [![Travis build
 status](https://travis-ci.org/srvanderplas/bulletsamplr.svg?branch=master)](https://travis-ci.org/srvanderplas/bulletsamplr)
 [![Coverage
