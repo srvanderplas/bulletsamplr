@@ -32,18 +32,42 @@
 \addtolength{\textheight}{1.3in}%
 \addtolength{\topmargin}{-.8in}%
 
-\newenvironment{definition}[1]% environment name 
-{% begin code 
-  \par\vspace{.75\baselineskip}\noindent 
-  \textbf{Definition (#1)}\begin{itshape}% 
-  \par\vspace{.5\baselineskip}\noindent\ignorespaces 
-}% 
-{% end code 
-  \end{itshape}\ignorespacesafterend 
+\newenvironment{definition}[1]% environment name
+{% begin code
+  \par\vspace{.75\baselineskip}\noindent
+  \textbf{Definition (#1)}\begin{itshape}%
+  \par\vspace{.5\baselineskip}\noindent\ignorespaces
+}%
+{% end code
+  \end{itshape}\ignorespacesafterend
 }
 
 \providecommand{\tightlist}{%
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+% --- TODO ---------------------------------------------------------------------
+\usepackage[colorinlistoftodos]{todonotes}
+\newcommand{\comment}[2][inline]{\todo[color=SkyBlue, #1]{#2}}
+\newcommand{\newdo}[1]{\todo[inline, color=Lime]{#1}} % new to do item
+% \newcommand{\todo}[1]{\todo[inline, color=Orange]{#1}} % new to do item
+% ------------------------------------------------------------------------------
+
+% --- Font specification -------------------------------------------------------
+\usepackage{ifxetex}
+\usepackage{ifpdf}
+\usepackage{hyperref}
+
+\ifpdf
+    \usepackage[utf8]{inputenc}
+    \usepackage[T1]{fontenc}
+\else \ifxetex
+    \usepackage{fontspec}
+\fi
+% ------------------------------------------------------------------------------
+
+% --- Misc ---------------------------------------------------------------------
+% \usepackage{biblatex}
+% ------------------------------------------------------------------------------
+
 
 \begin{document}
 

@@ -18,12 +18,13 @@ abstract: |
 bibliography: refs
 biblio-style: apsr
 
+
 output: 
   pdf_document:
     citation_package: natbib
     keep_tex: true
     fig_caption: true
-    latex_engine: pdflatex
+    latex_engine: xelatex
     template: template.tex
 
 ---
@@ -31,10 +32,24 @@ output:
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  echo = FALSE,
+  comment = "#>",
+  dpi = 300,
+  out.width = "\\textwidth",
+  fig.width = 8, fig.height = 5
 )
 ```
 
+```{r pkg-setup, include = F}
+library(ggplot2)
+library(bulletsamplr)
+library(bulletxtrctr)
+library(dplyr)
+library(purrr)
+library(stringr)
+library(gridExtra)
+library(grid)
+```
 
 # Introduction
 
@@ -47,11 +62,79 @@ A common question in forensics (whether statistical or examiner based) is the er
 
 Derivation of this likelihood ratio depends heavily on the reference distributions derived from known matches and known non matches. These reference distributions are assembled from collected data, which may be sparse for a given set of class characteristics (firearm, barrel manufacturing process, ammunition type). 
 
-In order to present evidence in court, it is particularly important to assess false positive rate (the probability of declaring a match when the data are from different sources). For score-based problems, the false positive rate is tied to the quality of the estimate of the denominator above, that is, the probability of observing $x$ when it is known that the two pieces of evidence are from different sources. It is generally impractical to derive this probability experimentally - one would need to compare very large amounts of data from different sources stemming from the population of interest; for bullet comparisons, for instance, it would be necessary to gather bullets fired from a large number of barrels with class characteristics similar to those referenced, compare each fired bullet to each other bullet, and determine the number of bullets which have a score greater than $x$ observed score. 
+In order to present evidence in court, it is particularly important to assess the false positive rate (the probability of declaring a match when the data are from different sources). For score-based problems, the false positive rate is tied to the quality of the estimate of the denominator above, that is, the probability of observing $x$ when it is known that the two pieces of evidence are from different sources. It is generally impractical to derive or even bound this probability experimentally, as that requires the collection and comparison of very large amounts of data from different sources stemming from the population of interest. For bullet comparisons, for instance, it would be necessary to gather bullets fired from a large number of barrels with class characteristics similar to those referenced, compare each fired bullet to each other bullet, and determine the number of bullets which have a score greater than $x$ observed score. 
 
-It is much more reasonable to statistically derive the distribution of scores under known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. Other data generation and augmentation techniques have been used for handwriting data \citep{sesa-nogueras_writer_2013, rabasse_new_2008}, iris data\citep{wecker_multiresolution_2010}, and facial images \citep{leibe_we_2016}. With generated data, we can be reasonably certain that any correspondance between two generated patterns is entirely random. As long as important characteristics of the data are preserved, these random pattern data provide a much quicker process to assess the distribution of known non-matching pattern scores.  
+It is much more reasonable to statistically derive the distribution of scores under known match or known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. Other data generation and augmentation techniques have been used for handwriting data \citep{sesa-nogueras_writer_2013, rabasse_new_2008}, iris data\citep{wecker_multiresolution_2010}, and facial images \citep{leibe_we_2016}. With generated data, we can be reasonably certain that any correspondance between two generated patterns is entirely random. As long as important characteristics of the data are preserved, these randomly assembled pattern data provide a much quicker process to assess the distribution of known non-match and known match pattern scores.  
+
+Important characteristics of the LEA signature depend on the method used to process said signature. If the LEAs are to be visually examined, for instance, it is necessary to generate the full 3D image, as in \citet{bachrach_development_2013}. When the LEA signatures are automatically compared using an algorithm, synthetic data generation can stop at the signature level - extrapolation to the full 3D scan is not necessary. Additionally, it is important that the presence of problematic features, such as tank rash and missing values due to microscope errors, occur with approximately the same frequency in the generated sequences as in sequences from real data - this ensures that the reference distributions for known matches and known non-matches account for real-world constraints. \citet{bachrach_development_2013} propose a method for generating LEA cross sections and then extrapolating those cross sections to produce a simulated 3D scan, but their method produces sequences which are idealized and do not mimic the problems seen in collected data. 
+
+\todo[inline]{Images of problematic bullets with corresponding crosscuts}
+
 
 ## Threshold Bootstrap
+
+The threshold bootstrap was proposed by \citet{park_threshold_1999} as an alternative to the moving block bootstrap that preserves continuity at block endpoints. Typically used in time series to handle complex dependency structures, it can be repurposed here because of our desire to maintain spatial continuity. Using the threshold bootstrap ensures that we get a continuous sequence that, while not guaranteed to be differentiable, adequately mimics the smoothness of the source data. \autoref{fig:threshold-bootstrap-cycle-demo} shows a bullet signature, with the signature median value marked; the bottom image shows the blocks produced for use in the threshold bootstrap, where each block contains 1 cycle as defined by \citet{park_threshold_1999}. 
+
+```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In this figure, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data.\footnote{The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created as described in the `bulletxtrctr` package demo.} Chunks 0 and 13 are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence.", warning = F}
+data(sig)
+
+p1 <- ggplot(aes(x = x, y = sig), data = sig) + 
+  geom_line() + 
+  ggtitle("Original Signature") + 
+  theme(axis.title = element_blank(), axis.text.x = element_blank())
+
+threshold <- median(sig$sig, na.rm = T)
+p2 <- ggplot(aes(x = x, y = sig), data = sig) + 
+  geom_hline(aes(yintercept = threshold), color = "red") + 
+  geom_line() + 
+  ggtitle("Original Signature + Threshold used to create cycles") + 
+  theme(axis.title = element_blank(), axis.text.x = element_blank())
+
+sig_slices <- sig %>%
+  mutate(xold = x, sigold = sig) %>% 
+  crosscut_slice() %>% 
+  bind_rows() %>%
+  group_by(.chunk) %>%
+  # mutate(x = x - mean(x, na.rm = T)) %>%
+  ungroup()
+
+shuffle <- function(x) {
+  sample(x, size = length(x), replace = F)
+}
+
+sig_slices_sum <- sig_slices %>% 
+  select(.chunk, xold, sigold) %>%
+  group_by(.chunk) %>% 
+  mutate(chunksplit = (row_number() == 1),
+         labelmax = max(sigold, na.rm = T),
+         chunkmid = mean(xold, na.rm = T), 
+         chunkmin = min(xold),
+         chunkmax = max(xold)) %>%
+  ungroup() %>%
+  filter(chunksplit) %>%
+  select(-chunksplit)
+
+
+p3 <- ggplot(data = sig_slices, aes(x = xold, y = sigold, color = factor(.chunk))) +
+  geom_segment(aes(x = chunkmin, xend = chunkmax, 
+                   y = labelmax + 0.05, yend = labelmax + 0.05), 
+               data = sig_slices_sum,
+               arrow = arrow(ends = "both", type = "closed", 
+                             length = unit(0.15, "lines"))) + 
+  geom_text(aes(x = chunkmid, y = labelmax + .07, label = .chunk), 
+            vjust = -0.1, data = sig_slices_sum, inherit.aes = F) +
+  geom_hline(aes(yintercept = threshold), color = "grey40") + 
+  geom_line() + 
+  scale_color_discrete("Chunk", guide = F) + 
+  scale_y_continuous(expand = expand_scale(mult = .05, add = c(0, .5))) + 
+  ggtitle("Cycles (and boundary regions)") + 
+  theme(axis.title = element_blank(), axis.text.x = element_blank())
+
+grid.arrange(p2, p3, ncol = 1)
+
+```
+
+
 
 Misappropriated from time-series statistics; important because it maintains continuity and should be relatively differentiable (in practice)
 
