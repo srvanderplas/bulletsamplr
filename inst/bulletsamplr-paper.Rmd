@@ -51,6 +51,121 @@ library(gridExtra)
 library(grid)
 ```
 
+```{r functions, include = F}
+
+ccdata_align <- function(ccd1, ccd2) {
+  sig_align(ccd1$sig, ccd2$sig)
+}
+
+plot_align_multistudy <- function(df, framed = NULL, show_phase = F, plot_title = sprintf("Barrel %02d, Bullet 1 & 2, across 3 Hamby studies", unique(df$Barrel) %>% as.numeric())) {
+
+  df <- df %>% mutate_at(vars(matches("Study")), ~str_replace_all(., "Hamby|Rescan", "")) %>%
+    mutate(bs = sprintf("Study %02s\nBullet %s", Study, Bullet),
+           bs1 = sprintf("Study %02s\nBullet %s", Study1, Bullet1))
+  framed <- framed %>% 
+    ungroup() %>% 
+    mutate_at(vars(matches("Study")), ~str_replace_all(., "Hamby|Rescan", "")) %>%
+    mutate(bs = sprintf("Study %02s\nBullet %s", Study, Bullet),
+           bs1 = sprintf("Study %02s\nBullet %s", Study1, Bullet1))
+  
+  p <- df %>%
+    ggplot() + 
+    geom_tile(aes(x = Land, y = Land1, fill = ccf)) + 
+    facet_grid(bs1 ~ bs) + 
+    scale_fill_gradient2(low = "gray", high = "darkorange", mid = "white", midpoint = .5) + 
+    ggtitle(plot_title) + 
+    coord_fixed() + 
+    theme(axis.title = element_blank())
+  
+  if (!is.null(framed)) {
+      p <- p + geom_tile(aes(x = Land, y = Land1), 
+                color = "darkorange", size = .75, fill = 'transparent', 
+                data = framed)
+  }
+
+  if (!is.null(framed) & show_phase) {
+    tmp <- framed %>% select(bs, bs1, phase) %>% unique() %>%
+      mutate(x = ifelse(phase %in% c("C", "D", "E"), 3.5, 5),
+             y = ifelse(phase %in% c("C", "D", "E"), 3.5, 2))
+    p <- p + geom_text(aes(x = x, y = y, label = phase), data = tmp)
+  }
+  
+  p
+}
+
+aligned_barrels <- c(1:10) %>% as.list()
+match_all_studies <- function(i, con) {
+  barrel <- sprintf(c("%d", "%02d"), i)
+  barrel <- tbl(con, "bullet.crosssection") %>%
+    filter(Barrel %in% barrel) %>%
+    collect()
+  
+  barrel <- barrel %>% group_by(Study, Barrel, Bullet, Land, id, source) %>%
+    nest(x, y, value, sig, .key = 'ccdata') %>%
+    ungroup()
+  
+  barrel_align <- tidyr::crossing(barrel, barrel) %>%
+    filter(!(Study == Study1 & Bullet == Bullet1)) %>%
+    mutate(align = furrr::future_map2(ccdata, ccdata1, ccdata_align))
+  
+  barrel_align <- barrel_align %>%
+    mutate(ccf = sapply(align, function(.) .$ccf),
+           lag = sapply(align, function(.) .$lag))
+  
+  aligned_barrels[[i]] <<- barrel_align
+  
+  plot_align_multistudy(barrel_align, i)
+}
+
+circular_slice <- function(x, offset) {
+  n <- ifelse(is.vector(x), length(x), nrow(x))
+  offset <- (offset %% n)
+  if (offset > 0) {
+    idx <- c((offset + 1):n, 1:offset)
+  } else {
+    idx <- 1:n
+  }
+  
+  if (is.vector(x)) {
+    return(x[idx])
+  } else if (length(dim(x)) > 1) {
+    return(x[idx,])
+  } else return(NULL)
+}
+
+compute_best_phase <- function(df, phasevars = c("Land", "Land1"), 
+                               val_var = "ccf", 
+                               group_vars = c("Study", "Study1", 
+                                              "Barrel", "Barrel1", 
+                                              "Bullet", "Bullet1")) {
+  v1 <- df %>% magrittr::extract2(phasevars[1]) %>% unique()
+  v2 <- df %>% magrittr::extract2(phasevars[2]) %>% unique()
+  phase <- LETTERS[1:length(v1)]
+  n1 <- length(v1)
+  n2 <- length(v2)
+  
+  nms <- list("v1", "v2") %>% set_names(phasevars)
+  
+  phasedata <- data_frame(
+    v1 = rep(v1, times = n2),
+    v2 = sapply(1:n2 - 1, circular_slice, x = v2) %>% as.vector(),
+    phase = rep(phase, each = n1)
+  )  %>%
+    rename_(.dots = nms)
+  
+  bestphase <- phasedata %>%
+    left_join(df, by = phasevars) %>%
+    group_by_(.dots = as.list(c(group_vars, "phase"))) %>%
+    mutate_(.dots = list("val" = val_var)) %>%
+    summarize(val = mean(val, na.rm = T)) %>%
+    arrange(desc(val)) %>%
+    filter(row_number() == 1)
+  
+  bestphase %>% left_join(phasedata, by = "phase") %>% ungroup()
+}
+
+```
+
 # Introduction
 
 A common question in forensics (whether statistical or examiner based) is the error rate of the assessment procedure. The term ``error rate'' includes the statistical concepts of false positives (declaring a match when the two pieces of evidence are from different sources) and false negatives (declaring that two pieces are from different sources when they are from the same source). Statistical methods for forensic comparisons take the following form: 
@@ -73,9 +188,9 @@ Important characteristics of the LEA signature depend on the method used to proc
 
 ## Threshold Bootstrap
 
-The threshold bootstrap was proposed by \citet{park_threshold_1999} as an alternative to the moving block bootstrap that preserves continuity at block endpoints. Typically used in time series to handle complex dependency structures, it can be repurposed here because of our desire to maintain spatial continuity. Using the threshold bootstrap ensures that we get a continuous sequence that, while not guaranteed to be differentiable, adequately mimics the smoothness of the source data. \autoref{fig:threshold-bootstrap-cycle-demo} shows a bullet signature, with the signature median value marked; the bottom image shows the blocks produced for use in the threshold bootstrap, where each block contains 1 cycle as defined by \citet{park_threshold_1999}. 
+The threshold bootstrap was proposed by \citet{park_threshold_1999} as an alternative to the moving block bootstrap that preserves continuity at block endpoints. Typically used in time series analysis to preserve complex dependency structures, it can be repurposed here because of our desire to maintain spatial continuity. Using the threshold bootstrap ensures that we get a continuous sequence that, while not guaranteed to be differentiable, adequately mimics the smoothness of the source data. \autoref{fig:threshold-bootstrap-cycle-demo} shows a bullet signature, with the signature median value marked; the bottom image shows the blocks produced for use in the threshold bootstrap, where each block contains 1 cycle as defined by \citet{park_threshold_1999}. A more formal explanation of the threshold bootstrap is provided in \autoref{generation-of-known-non-match-sequences}. 
 
-```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In this figure, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data.\footnote{The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created as described in the `bulletxtrctr` package demo.} Chunks 0 and 13 are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence.", warning = F}
+```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In this figure, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data.Chunks 0 and 13 are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence. The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created as described in the `bulletxtrctr` package demo.", warning = F}
 data(sig)
 
 p1 <- ggplot(aes(x = x, y = sig), data = sig) + 
@@ -134,13 +249,62 @@ grid.arrange(p2, p3, ncol = 1)
 
 ```
 
+This paper demonstrates the use of the threshold bootstrap to create simulated LEA signatures under known match and known non-match conditions. Three Hamby test sets (36, 44, 252) were used to generate the ``library" of data fed into the threshold bootstrap to produce the simulated signatures. In general, it is important to have source data which is composed of both same-source and different-source sequences: the same-source sequences are used to create known match LEA signatures, while the different-source sequences are used to create known non-match LEA signatures. 
 
+## Hamby studies
 
-Misappropriated from time-series statistics; important because it maintains continuity and should be relatively differentiable (in practice)
+The Hamby studies work well to demonstrate the threshold bootstrap because of their structure: each set consists of 35 bullets fired from 10 barrels. The study is a `closed set' study, which means that all unknown bullets were actually fired from the same barrels which produced the known bullets; that is, each unknown bullet does match a set of known bullets. In each Hamby set, there are 20 known bullets; 2 for each of the 10 barrels used in the study. There are also 15 unknown bullets which can be matched to one of the 10 barrels. 
 
-## Description of Hamby studies
 
 # Threshold bootstrap and bullet signatures
+
+## Source Data
+
+This paper demonstrates the application of the threshold bootstrap to LEA signature generation. The input data are LEA signatures from bullets scanned using a Sensofar ???\todo[inline]{microscope model} at 20x resolution. The scans were processed using the `bulletxtrctr` package \citep{bulletxtrctr} with default smoothing parameters; grooves were adjusted manually after automatic identification. The `bulletxtrctr` package provides an open-source implementation of the algorithm described in \citet{hare_automatic_2016}. 
+
+One of the strengths of utilizing the threshold bootstrap for sequence generation is that we can be confident that features of the LEA sequences which are attributable to the pre-processing method used are preserved in the data. This is, of course, a trade-off: the feature distributions which are the end result of the bootstrapping process may not generalize to other processing methods. Similarly, if there are differences in the features of signatures produced from different ammunition or barrel manufacturing methods, it may be unwise to use distributions generated from different source materials. Ideally, the distributional results would be relatively robust to these changes, as there are several levels of abstraction between the data and the resulting match score, but that is left to some future study. 
+
+Provided that relevant source data exist, the threshold bootstrap is applicable to any automatic processing method which reduces a 3D scan of a land to a single sequence of points describing a cross-section of the land engraved area. The choice to demonstrate the method using one specific processing method is primarily one of convenience. 
+
+## Generation of Known Non-Match Sequences
+
+It will be helpful at this point to define some notation:
+
+Our data consist of signatures $S_{ijk}$ from $i = 1, ..., M$ source barrels. Each barrel has $j = 1, ..., N_i$ bullets, and each bullet has $k = 1, ..., K_i$ lands, where $K_i$ is fixed for each barrel and $k$ are assigned sequentially such that land 1 borders land 2 on one side and land $K_i$ on the other. Assuming a complete collection (no missing lands, all lands suitable for analysis) there are $\sum_{i=1}^M N_i \times k_i$ sequences available for use in the creation of bootstrap signatures. 
+
+For any two sets of signatures $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$ from the same barrel, there are $K_i$ possible arrangements of the sequences which maintain the physical ordering of lands on the bullet. Without loss of generality, fix the order of $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and manipulate only $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$. There are $K_i$ possible sequential orderings, each corresponding to a line drawn somewhere in the sequence $1, 2, ..., K_i$. Thus, for each of the $K_i$ possibilities, we can define the phase of a bullet alignment to be $P_{j_1, j_2} = A, B, C, ...$, where each letter represents one of the $K_i$ possible alignments. Typically lands are numbered during the scanning process, and these numbers depend on the land scanned first - only the relative ordering matters; thus, to avoid confusion between land numbers and phases, letters are used to denote phase values. 
+
+```{r align, fig.cap = "Possible phases for aligned sequences taken from barrels with 6 lands."}
+df <- tidyr::crossing(Bullet = 1, Bullet1 = 2, Land = 1:6, Land1 = 1:6, phase = LETTERS[1:6]) %>%
+  mutate(ccf = rnorm(n()))
+phasedata <- data_frame(
+  Bullet = 1, Bullet1 = 2,
+  Land = rep(1:6, times = 6),
+  Land1 = sapply(1:6 - 1, circular_slice, x = 1:6) %>% as.vector(),
+  phase = rep(LETTERS[1:6], each = 6)
+) 
+
+tmp <- phasedata %>% select(-Land, -Land1) %>% unique() %>%
+  mutate(x = ifelse(phase %in% c("C", "D", "E"), 3.5, 5),
+         y = ifelse(phase %in% c("C", "D", "E"), 3.5, 2))
+
+ggplot() + 
+  geom_tile(aes(x = Land, y = Land1, fill = ccf), data = df) + 
+  geom_tile(aes(x = Land, y = Land1), fill = 'blue', data = phasedata) + 
+  facet_grid(.~phase) + 
+  scale_x_continuous("Sequence 2", breaks = 1:6) + scale_y_continuous("Sequence 1", breaks = 1:6) + 
+  # theme(axis.title = element_blank()) + 
+  scale_fill_gradient2(guide = F, low = "blue", high = "red", mid = "white", limits = c(-500, 500)) + 
+  coord_fixed() + 
+  ggtitle("Alignment phases between two bullets")
+
+```
+
+As signatures from the same physical land have similar features, we need to ensure that the bootstrap sampling scheme used does not allow for incidental overlap due to the fact that our signatures are not independent. The simplest way to do this is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$. It would be possible to get a less granular sampling scheme by incorporating phase information into the determination of collections, but the benefit of this additional complexity seems small. For the Hamby data sets, we have separated the barrels into odd and even groups, and bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. 
+
+Each sequence $S_{ijk}$ is broken into chunks $C_{ijkl}$, where $l \in 0, ..., L_{ijk}$ and $L_{ijk} + 1$ is the number of chunks in sequence $S_{ijk}$. Let $\mathscr{L}_{ijkl}$ be the length of chunk $L_{ijkl}$. Note that $C_{ijk0}$ and $C_{ijkL_{ijk}}$ are boundary chunks, that is, they do not consist of a full cycle or cycles. 
+
+Then a signature generated from the threshold bootstrap, $S^\ast$, is composed of chunks $C^\ast_0$, $C^\ast_z$, $z = 1, ..., Z-1$, and $C^\ast_Z$, where $C^\ast_0$ and $C^\ast_Z$ are sampled from the collection of boundary chunks $\{C_{ijk0}, C_{ijkL_{ijk}}\}$ and $C^\ast_z$ are sampled from the collection of complete chunks. The number of chunks used to create $S^\ast$ is chosen by assembling chunks until $S^\ast$ is approximately the desired length; $S^\ast$ is then truncated (NA values only) or padded with NA values until $S^\ast$ is the pre-specified length. It is common for signatures to have NA values at the beginning and the end of the sequence, so this approximately replicates qualities of the data observed empirically. 
 
 ## Consecutive Matching Striae and resampling
 
