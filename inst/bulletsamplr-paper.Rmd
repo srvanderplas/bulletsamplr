@@ -569,7 +569,7 @@ Then a signature generated from the threshold bootstrap, $S^\ast$, of target len
 
 For known non-matching sequences, the input sequences $S$ are the computed signatures from each of the lands in the collection of imaged data and are indexed by $i$, the barrel number, $j$, the sequence number for each barrel $i$, and $k$, the land number.
 
-```{r aligned-chunks}
+```{r aligned-chunks, fig.cap="There is significant correspondence between the breaks of aligned sequences. We must avoid using sequences in different rows when comparing two generated sequences, because the incidental probability of correspondence is higher than it would be for chunks from completely independent sequences resampled with replacement."}
 barrel_align_cycle_split <- barrel_align_plotable %>% 
   select(id, .chunk, xold, line_id, Barrel, LandSet) %>%
   group_by(id, .chunk) %>% 
@@ -589,7 +589,7 @@ ggplot() +
 
 As signatures from the same physical land in the same barrel have similar features, we need to ensure that the bootstrap sampling scheme used does not allow for incidental overlap due to the fact that our signatures are not independent. As shown in \autoref{fig:aligned-chunks}, the chunk boundaries of aligned sequences tend to be aligned, though the correspondence is not exact due to slight variations in how the signature median intersects the signature.
 
-The simplest way to ensure non-matching sequences is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$. For the Hamby data sets, we have separated the barrels into odd and even groups, and bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. 
+The simplest way to ensure non-matching sequences is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$. For the Hamby data sets, we have separated the barrels into odd and even groups, and bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. Another option would be to use only one sequence from each barrel, but that dramatically reduces the number of chunks available for resampling, and potentially reduces the probability of seeing certain types of poor-quality data. 
 
 
 
