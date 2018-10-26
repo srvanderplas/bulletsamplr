@@ -309,6 +309,16 @@ if (!file.exists("barrel_align_plot.rda")) {
     mutate(line_id = factor(id) %>% as.numeric()) %>%
     ungroup() %>%
     mutate(LandSet = letter)
+  
+  barrel_align_cycle <- barrel_align_plotable %>% 
+  select(Barrel, LandSet, letter, id, line_id, set, x, sig) %>%
+  mutate(xold = x, sigold = sig) %>%
+  split(.$id) %>%
+  purrr::map_df(., ~crosscut_slice(.) %>% bind_rows()) %>%
+  mutate(sig_cycle = sig, sig = sigold, x_cycle = x, x = xold)
+
+  barrel_align_plotable <- left_join(barrel_align_plotable, barrel_align_cycle)
+
   saveRDS(barrel_align_plotable, "barrel_align_plot.rda")
 } else {
   barrel_align_plotable <- readRDS("barrel_align_plot.rda")
@@ -497,9 +507,15 @@ Provided that relevant source data exist, the threshold bootstrap is applicable 
 
 It will be helpful at this point to define some notation:
 
-Our data consist of signatures $S_{ijk}$ from $i = 1, ..., M$ source barrels. Each barrel has $j = 1, ..., N_i$ bullets, and each bullet has $k = 1, ..., K_i$ lands, where $K_i$ is fixed for each barrel and $k$ are assigned sequentially such that land 2 borders land 1 on one side and land 3 on the other. Assuming a complete collection (no missing lands, all lands suitable for analysis) there are $\sum_{i=1}^M N_i \times k_i$ sequences available for use in the creation of bootstrap signatures. 
+- Our data consist of signatures $S_{ijk}$ from $i = 1, ..., M$ source barrels. 
+- Each barrel has $j = 1, ..., N_i$ bullets
+- Each bullet has $k = 1, ..., K_i$ lands, where $K_i$ is fixed for each barrel and $k$ are assigned sequentially such that land 2 borders land 1 on one side and land 3 on the other. 
 
-For any two signatures $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$ from the same barrel, there are $K_i$ possible arrangements of the sequences which maintain the physical ordering of lands on the bullet. Without loss of generality, fix the order of $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and manipulate only $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$. There are $K_i$ possible sequential orderings, each corresponding to a line drawn somewhere in the sequence $1, 2, ..., K_i$. Thus, for each of the $K_i$ possibilities, we can define the phase of a bullet alignment to be $P_{j_1, j_2} = A, B, C, ...$, where each letter represents one of the $K_i$ possible alignments. Typically lands are numbered during the scanning process, and these numbers depend on the land scanned first - only the relative ordering matters; thus, to avoid confusion between land numbers and phases, letters are used to denote phase values. 
+Assuming a complete collection (no missing lands, all lands suitable for analysis) there are $\sum_{i=1}^M N_i \times k_i$ sequences available for use in the creation of bootstrap signatures. 
+
+#### Alignment Phases
+
+For any two signatures $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$ from the same barrel, there are $K_i$ possible arrangements of the sequences which maintain the physical ordering of lands on the bullet. Without loss of generality, fix the order of $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and manipulate only $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$. For each of the $K_i$ possibilities, we can define the phase of a bullet alignment to be $P_{j_1, j_2} = A, B, C, ...$, where each letter represents one of the $K_i$ possible alignments. Typically lands are numbered during the scanning process, and these numbers depend on the land scanned first - only the relative ordering matters; thus, to avoid confusion between land numbers and phases, letters are used to denote phase values. 
 
 
 ```{r align, fig.cap = "Possible phases for aligned sequences taken from barrels with 6 lands."}
@@ -528,25 +544,52 @@ ggplot() +
 
 ```
 
-During the threshold bootstrap process, each sequence $S_{ijk}$ is broken into chunks $C_{ijkl}$ consisting of $t$ cycles (or $t$ line crossings, provided $C_{ijkl}$ starts near 0, ends near 0 with sign opposite the starting sign), where $l \in 0, ..., L_{ijk}$ and $L_{ijk} + 1$ is the number of chunks in sequence $S_{ijk}$. Let $\mathscr{L}_{ijkl}$ be the length of chunk $L_{ijkl}$. Note that $C_{ijk0}$ and $C_{ijkL_{ijk}}$ are boundary chunks, that is, they do not consist of a complete $t$ cycles. The final chunk $C_{ijkL_{ijk}}$ is reversed so that the missing values are on the left-hand side of the sequence. 
+#### Chunk Creation
+
+During the threshold bootstrap process, each sequence $S$ is broken into chunks $C_{l}$, where $l \in 0, ..., L$ and $L + 1$ is the number of chunks in sequence $S$. Each complete chunk is composed of $t$ cycles around the sequence median. 
+
+Let $\mathscr{L}_{l}$ be the length of chunk $C_{l}$. Note that $C_{0}$ and $C_{L}$ are boundary chunks, that is, they do not consist of a complete $t$ cycles. The final chunk $C_{L}$ is reversed so that the missing values are on the left-hand side of the sequence - this allows the chunks at the beginning and end of the sequence to be used interchangeably. 
+
+#### Bootstrap Signature Creation
 
 Then a signature generated from the threshold bootstrap, $S^\ast$, of target length $\mathscr{T}_t^\ast$ is assembled from $Z^\ast$ chunks as follows: 
 
 \begin{enumerate}
 \item The sign of the sequence, $a$, is selected randomly from $-1, +1$, where $-1$ means that full chunks will initially be negative and the last value will be positive.
-\item Boundary chunks $C^\ast_0, C^\ast_Z$ are sampled from the collection of boundary chunks $\{C_{ijk0}, C_{ijkL_{ijk}}\}_{\forall i, j, k}$. These chunks have length $\mathscr{L}_0$ and $\mathscr{L}_Z$ respectively. 
+\item Boundary chunks $C^\ast_0, C^\ast_Z$ are sampled from the collection of boundary chunks. These chunks have length $\mathscr{L}_0$ and $\mathscr{L}_Z$ respectively. 
 \item The total number of missing values at the beginning of the boundary chunks, $m^\ast$ is calculated.
 \item $C^\ast_0$ is arranged so as to be compatible with the chosen sign $a$.
 \item $C^\ast_Z$ is reversed and arranged to be compatible with the chosen sign $a$.
-\item The list of all complete chunks $\{C_{ijkl}\}_{0 < l < L_{ijk}}$ is permuted and truncated such that the cumulative length of the chunks is less than the remaining length excluding missing values, $\mathscr{L}_{0} + \mathscr{L}_{Z} - m^\ast$, or the first chunk in the case that the first chunk selected is longer than the remaining length.
+\item The list of all complete chunks $\{C\}_{0 < l < L}$ is permuted and truncated such that the cumulative length of the chunks is less than the remaining length excluding missing values, $\mathscr{L}_{0} + \mathscr{L}_{Z} - m^\ast$, or the first chunk in the case that the first chunk selected is longer than the remaining length.
 \item The chunks are assembled by index
 \item The sequence is either truncated or padded with NAs so that it has target length $\mathscr{T}_t^\ast$
 \end{enumerate}
 
 ## Generation of Known Non-Match Sequences
 
-For known non-matching sequences, the input sequences $S_{ijk}$
-As signatures from the same physical land in the same barrel have similar features, we need to ensure that the bootstrap sampling scheme used does not allow for incidental overlap due to the fact that our signatures are not independent. The simplest way to do this is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$. It would be possible to get a less granular sampling scheme by incorporating phase information into the determination of collections, but the benefit of this additional complexity seems small. For the Hamby data sets, we have separated the barrels into odd and even groups, and bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. 
+For known non-matching sequences, the input sequences $S$ are the computed signatures from each of the lands in the collection of imaged data and are indexed by $i$, the barrel number, $j$, the sequence number for each barrel $i$, and $k$, the land number.
+
+```{r aligned-chunks}
+barrel_align_cycle_split <- barrel_align_plotable %>% 
+  select(id, .chunk, xold, line_id, Barrel, LandSet) %>%
+  group_by(id, .chunk) %>% 
+  mutate(chunksplit = (row_number() == 1 & .chunk != 0)) %>%
+  ungroup() %>%
+  filter(chunksplit) %>%
+  mutate(xold = xold - .5)
+
+ggplot() + 
+  theme_bw() +
+  facet_grid(line_id~LandSet, labeller = label_both) +
+  geom_line(aes(x = x, y = sigold), data = filter(barrel_align_plotable, Barrel == 1, LandSet == 'a')) + 
+  geom_vline(aes(xintercept = xold), data = filter(barrel_align_cycle_split, Barrel == 1, LandSet == 'a')) + 
+  theme(axis.title = element_blank(), axis.text.y = element_blank()) + 
+  ggtitle("Cycle Breaks for Hamby Barrel 1 Aligned LEAs")
+```
+
+As signatures from the same physical land in the same barrel have similar features, we need to ensure that the bootstrap sampling scheme used does not allow for incidental overlap due to the fact that our signatures are not independent. As shown in \autoref{fig:aligned-chunks}, the chunk boundaries of aligned sequences tend to be aligned, though the correspondence is not exact due to slight variations in how the signature median intersects the signature.
+
+The simplest way to ensure non-matching sequences is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$. For the Hamby data sets, we have separated the barrels into odd and even groups, and bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. 
 
 
 

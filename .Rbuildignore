@@ -11,4 +11,5 @@
 ^\.Rproj\.user$
 ^inst/.*\.pdf$
 ^inst/.*\.tex$
+^inst/.*\.rda$
 ^inst/.*_.*$
