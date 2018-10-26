@@ -9,3 +9,6 @@
 ^\.Rprofile$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^inst/.*\.pdf$
+^inst/.*\.tex$
+^inst/.*_.*$
