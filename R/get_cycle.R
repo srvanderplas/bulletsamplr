@@ -22,10 +22,11 @@ crosscut_slice <- function(x, ncycle = 1) {
       msg = paste0("sig must either be numeric or a list or ",
                    "data.frame containing a column named 'sig'"))
     sig <- x$sig
-    sig.n <- x
+    sig.n <- x %>%
+      mutate(sig = sig - stats::median(sig, na.rm = T))
   } else {
     sig <- x
-    sig.n <- x
+    sig.n <- x - stats::median(x, na.rm = T)
   }
 
   assertthat::assert_that(is.numeric(sig))
@@ -79,8 +80,6 @@ chunk_slice <- function(sig, map_chunk, map_start, map_end, map_type) {
   }
   z$.type <- map_type
 
-  med_val <- stats::median(z$sig, na.rm = T)
-
   if (map_type == "end") {
     # z$x <- -z$x + max(z$x)
     z$sig <- rev(z$sig)
@@ -89,7 +88,7 @@ chunk_slice <- function(sig, map_chunk, map_start, map_end, map_type) {
   z <- z %>%
     mutate(
       x = x - min(x, na.rm = T),
-      sig = sig - med_val,
+      sig = sig,
       .chunk = map_chunk
     )
 
