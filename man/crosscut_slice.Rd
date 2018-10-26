@@ -2,21 +2,23 @@
 % Please edit documentation in R/get_cycle.R
 \name{crosscut_slice}
 \alias{crosscut_slice}
-\title{Slice signature into cycles}
+\title{Slice signature into chunks consisting of N cycles}
 \usage{
-crosscut_slice(x)
+crosscut_slice(x, ncycle = 1)
 }
 \arguments{
 \item{x}{a numeric vector with signature information}
+
+\item{ncycle}{number of cycles per chunk}
 }
 \value{
 a list of vectors with signature cycles
 }
 \description{
-Slice signature into cycles
+Slice signature into chunks consisting of N cycles
 }
 \examples{
 data("sig")
 crosscut_slice(sig) # Slice whole data frame
-crosscut_slice(sig$sig) # Slice signature only
+crosscut_slice(sig$sig, ncycle = 3) # Slice signature only, using 3 cycles/chunk
 }
