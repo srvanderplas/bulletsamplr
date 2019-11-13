@@ -13,11 +13,10 @@ keywords:
 - 3 to 6 keywords
 - that do not appear in the title
 
-abstract: |
+abstract: abstract-text
   
 bibliography: refs
 biblio-style: apsr
-
 
 output: 
   pdf_document:
@@ -37,7 +36,8 @@ knitr::opts_chunk$set(
   comment = "#>",
   dpi = 300,
   out.width = "\\textwidth",
-  fig.width = 8, fig.height = 5
+  fig.width = 8, fig.height = 5,
+  message = F, warning = F
 )
 ```
 
@@ -356,9 +356,11 @@ Derivation of this likelihood ratio depends heavily on the reference distributio
 
 In order to present evidence in court, it is particularly important to assess the false positive rate (the probability of declaring a match when the data are from different sources). For score-based problems, the false positive rate is tied to the quality of the estimate of the denominator above, that is, the probability of observing $x$ when it is known that the two pieces of evidence are from different sources. It is generally impractical to derive or even bound this probability experimentally, as that requires the collection and comparison of very large amounts of data from different sources stemming from the population of interest. For bullet comparisons, for instance, it would be necessary to gather bullets fired from a large number of barrels with class characteristics similar to those referenced, compare each fired bullet to each other bullet, and determine the number of bullet matches which have a score greater than $x$ observed score. 
 
-It is much more reasonable to statistically derive the distribution of scores under known match or known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. Other data generation and augmentation techniques have been used for handwriting data \citep{sesa-nogueras_writer_2013, rabasse_new_2008}, iris data\citep{wecker_multiresolution_2010}, and facial images \citep{leibe_we_2016}. With generated data, we can be reasonably certain that any correspondance between two generated patterns is entirely random. As long as important characteristics of the data are preserved, these randomly assembled pattern data provide a much quicker process to assess the distribution of known non-match and known match pattern scores.  
+It is much more reasonable to statistically derive the distribution of scores under known match or known non-match conditions by using a bootstrap or resampling technique to generate the numeric data produced in step 1 above. \citet{bachrach_development_2013} generated bullet signatures using wavelets and fractals to mimic the identified features of land engraved area signatures. Other data generation and augmentation techniques have been used for handwriting data \citep{sesa-nogueras_writer_2013, rabasse_new_2008}, iris data\citep{wecker_multiresolution_2010}, and facial images \citep{leibe_we_2016}. With generated data, we can be reasonably certain that any correspondance between two generated patterns is entirely random. As long as important characteristics of the data are preserved, these randomly assembled pattern data provide a much quicker method to assess the distribution of known non-match and known match pattern scores.  
 
-Important characteristics of the LEA signature depend in part on the method used to transform the collected 3D image into a signature. We would not expect that different filtering and noise removal methods would produce signatures with exactly the same shapes or properties. In addition, if comparisons take place at the image level, it is necessary to use a generation method capable of creating a simulated 3D image; if comparisons take place at the signature level, there is no need to simulate the entire 3D image, as in \citet{bachrach_development_2013}. 
+### Statistical Analysis of Bullet Land Engraved Areas
+
+Comparison of bullet land engraved areas (LEAs) typically involves distilling the 3D scan of the area of interest into a two-dimensional ``signature" that removes artifacts originating from the grooves as well as the curvature of the bullet. \citet{hare_automatic_2016} provides one method for distilling bullet scans into signatures; alternate methods used in \citet{vorburgerApplicationsCrosscorrelationFunctions2011} should also be compatible with the approach described in this paper. Important characteristics of the LEA signature depend in part on the method used to transform the collected 3D image into a signature. We would not expect that different filtering and noise removal methods would produce signatures with exactly the same shapes or properties. By working with comparisons at the signature level, rather than the full image level, we do not have to simulate the entire 3D image, as in \citet{bachrach_development_2013}. 
 
 It is important that the presence of problematic features, such as tank rash and missing values due to microscope error, occur with approximately the same frequency in the generated sequences as in sequences from real data. This ensures that the reference distributions for known matches and known non-matches account for real-world constraints. The method for synthetic signature generation proposed in \citet{bachrach_development_2013} produces sequences and 3D images which are idealized and do not mimic the problems seen in collected data. Examples of problematic lands in the Hamby 44 test set are shown in \autoref{fig:tankrash}. 
 
@@ -393,11 +395,11 @@ for (i in unique(problem_crosscuts$Barrel)) {
 
 ```
 
-## Threshold Bootstrap
+### Threshold Bootstrap
 
 The threshold bootstrap was proposed by \citet{park_threshold_1999} as an alternative to the moving block bootstrap that preserves continuity at block endpoints. Typically used in time series analysis to preserve complex dependency structures, it can be repurposed here because of our desire to maintain spatial continuity. Using the threshold bootstrap ensures that we get a continuous sequence that, while not guaranteed to be differentiable, adequately mimics the smoothness of the source data. \autoref{fig:threshold-bootstrap-cycle-demo} shows a bullet signature, with the signature median value marked; the bottom two images shows the blocks produced for use in the threshold bootstrap, where each block contains 1 or 3 cycles, respectively, as defined by \citet{park_threshold_1999} . 
 
-```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In this figure, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data.Chunks 0 and 13 are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence. The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created as described in the `bulletxtrctr` package demo.", fig.height = 6, fig.width = 8, warning = F}
+```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In the second graph, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data. The third graph shows the same signature, divided into chunks consisting of 3 cycles. The first and last chunks are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence. The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created as described in the `bulletxtrctr` package demo.", fig.height = 6, fig.width = 8, warning = F}
 data(sig)
 threshold <- median(sig$sig, na.rm = T)
 p2 <- ggplot(aes(x = x, y = sig), data = sig) + 
@@ -486,20 +488,21 @@ grid.arrange(p2, p3, p4, ncol = 1)
 
 The chunks from one or more sequences are then sampled (with the chunk as the sampling unit) and assembled into a new sequence. The beginning and ending portions of the sequences can be sampled separately or can be discarded so that the bootstrap sequences are either composed of complete cycles or truncated, producing incomplete cycles. 
 
-This paper demonstrates the use of the threshold bootstrap to create simulated LEA signatures under known match and known non-match conditions. Three Hamby test sets (36, 44, 252) were used to generate the ``library" of data fed into the threshold bootstrap to produce the simulated signatures. In general, it is important to have source data which is composed of both same-source and different-source sequences: the same-source sequences are used to create known match LEA signatures, while the different-source sequences are used to create known non-match LEA signatures. 
+This paper demonstrates the use of the threshold bootstrap to create simulated LEA signatures under known match and known non-match conditions. Three Hamby test sets (36, 44, 252) were used to generate the ``library" of chunk data fed into the threshold bootstrap to produce the simulated signatures. In general, it is important to have source data which is composed of both same-source and different-source sequences: the same-source sequences are used to create known match LEA signatures, while the different-source sequences are used to create known non-match LEA signatures. 
 
-## Hamby studies
+### Hamby studies
 
 The Hamby studies work well to demonstrate the threshold bootstrap because of their structure: each set consists of 35 bullets fired from 10 barrels. The study is a `closed set' study, which means that all unknown bullets were actually fired from the same barrels which produced the known bullets; that is, each unknown bullet does match a set of known bullets. In each Hamby set, there are 20 known bullets; 2 for each of the 10 barrels used in the study. There are also 15 unknown bullets which can be matched to one of the 10 barrels. 
 
+The input data are LEA signatures taken from three Hamby studies (36, 44, 224). The bullets were scanned using a Sensofar Sneox1 confocal microscope at 20x resolution. The scans were processed using the `bulletxtrctr` package \citep{bulletxtrctr} with default smoothing parameters; grooves were adjusted manually after automatic identification. The `bulletxtrctr` package provides an open-source implementation of the algorithm described in \citet{hare_automatic_2016}. 
+
+With the Hamby data sets, we have separated the barrels into two groups consisting of odd and even-numbered barrels respectively. Bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. 
 
 # Threshold bootstrap and bullet signatures
 
 ## Source Data
 
-This paper demonstrates the application of the threshold bootstrap to LEA signature generation. The input data are LEA signatures taken from three Hamby studies (36, 44, 224). The bullets were scanned using a Sensofar Sneox1 confocal microscope at 20x resolution. The scans were processed using the `bulletxtrctr` package \citep{bulletxtrctr} with default smoothing parameters; grooves were adjusted manually after automatic identification. The `bulletxtrctr` package provides an open-source implementation of the algorithm described in \citet{hare_automatic_2016}. 
-
-One of the strengths of utilizing the threshold bootstrap for sequence generation is that we can be confident that features of the LEA sequences which are attributable to the pre-processing method used are preserved in the data. This is, of course, a trade-off: the feature distributions which are the end result of the bootstrapping process will not generalize to other methods for creating LEA signatures. Similarly, if there are differences in the features of signatures produced from different ammunition or barrel manufacturing methods, it may be unwise to use distributions generated from different source materials, particularly because it is known that different combinations of firearms and ammunition mark differently \citep{bonfanti_influence_1999}. Ideally, the distributional results would be relatively robust to these changes, as there are several levels of abstraction between the data and the resulting match score, but that is left to some future study. 
+This method requires signatures from known match and known non-match bullets; that is, from bullets fired from the same barrel as well as bullets fired from different barrels. One of the strengths of utilizing the threshold bootstrap for sequence generation is that we can be confident that features of the LEA sequences which are attributable to the pre-processing method used are preserved in the data. This is, of course, a trade-off: the feature distributions which are the end result of the bootstrapping process will not generalize to other methods for creating LEA signatures. Similarly, if there are differences in the features of signatures produced from different ammunition or barrel manufacturing methods, it may be unwise to use distributions generated from different source materials, particularly because it is known that different combinations of firearms and ammunition mark differently \citep{bonfanti_influence_1999}. Ideally, the distributional results would be relatively robust to these changes, as there are several levels of abstraction between the data and the resulting match score, but that is left to some future study. 
 
 Provided that relevant source data exist, the threshold bootstrap is applicable to any automatic processing method which reduces a 3D scan of a land to a single sequence of points describing a cross-section of the land engraved area. The choice to demonstrate the method using one specific processing method is primarily one of convenience. 
 
@@ -512,10 +515,9 @@ It will be helpful at this point to define some notation:
 - Each bullet has $k = 1, ..., K_i$ lands, where $K_i$ is fixed for each barrel and $k$ are assigned sequentially such that land 2 borders land 1 on one side and land 3 on the other. 
 
 Assuming a complete collection (no missing lands, all lands suitable for analysis) there are $\sum_{i=1}^M N_i \times k_i$ sequences available for use in the creation of bootstrap signatures. 
-
 #### Alignment Phases
 
-For any two signatures $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$ from the same barrel, there are $K_i$ possible arrangements of the sequences which maintain the physical ordering of lands on the bullet. Without loss of generality, fix the order of $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and manipulate only $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$. For each of the $K_i$ possibilities, we can define the phase of a bullet alignment to be $P_{j_1, j_2} = A, B, C, ...$, where each letter represents one of the $K_i$ possible alignments. Typically lands are numbered during the scanning process, and these numbers depend on the land scanned first - only the relative ordering matters; thus, to avoid confusion between land numbers and phases, letters are used to denote phase values. 
+For any two signatures $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$ from the same barrel, there are $K_i$ possible arrangements of the sequences which maintain the physical ordering of lands on the bullet. Without loss of generality, fix the order of $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and manipulate only $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$. For each of the $K_i$ possibilities, we can define the phase of a bullet alignment to be $P_{j_1, j_2} = A, B, C, ...$, where each letter represents one of the $K_i$ possible alignments. Typically lands are numbered during the scanning process, and these numbers depend on the land scanned first - only the relative ordering matters; thus, to avoid confusion between land numbers and phases, letters are used to denote phase values. 
 
 
 ```{r align, fig.cap = "Possible phases for aligned sequences taken from barrels with 6 lands."}
@@ -544,13 +546,16 @@ ggplot() +
 
 ```
 
+
+### Threshold Bootstrap
+
 #### Chunk Creation
 
 During the threshold bootstrap process, each sequence $S$ is broken into chunks $C_{l}$, where $l \in 0, ..., L$ and $L + 1$ is the number of chunks in sequence $S$. Each complete chunk is composed of $t$ cycles around the sequence median. 
 
 Let $\mathscr{L}_{l}$ be the length of chunk $C_{l}$. Note that $C_{0}$ and $C_{L}$ are boundary chunks, that is, they do not consist of a complete $t$ cycles. The final chunk $C_{L}$ is reversed so that the missing values are on the left-hand side of the sequence - this allows the chunks at the beginning and end of the sequence to be used interchangeably. 
 
-#### Bootstrap Signature Creation
+#### Bootstrap Signature Creation\label{threshold-bootstrap-alg}
 
 Then a signature generated from the threshold bootstrap, $S^\ast$, of target length $\mathscr{T}_t^\ast$ is assembled from $Z^\ast$ chunks as follows: 
 
@@ -587,9 +592,13 @@ ggplot() +
   ggtitle("Cycle Breaks for Hamby Barrel 1 Aligned LEAs")
 ```
 
-As signatures from the same physical land in the same barrel have similar features, we need to ensure that the bootstrap sampling scheme used does not allow for incidental overlap due to the fact that our signatures are not independent. As shown in \autoref{fig:aligned-chunks}, the chunk boundaries of aligned sequences tend to be aligned, though the correspondence is not exact due to slight variations in how the signature median intersects the signature.
+As signatures from the same physical land in the same barrel have similar features, we need to ensure that the bootstrap sampling scheme used does not allow for incidental overlap due to the fact that our signatures are not independent. As shown in \autoref{fig:aligned-chunks}, the chunk boundaries of aligned sequences tend to be aligned, though the correspondence is not exact due to slight variations in how the signature median intersects the signature. Even with these variations, simple random sampling from the entire set of available signature chunks would introduce the potential for unacceptable correspondance between sequences which are intended to be non-matching. Thus, a more restrictive sampling method which does not allow for the possibility of sampling from signatures originating from the same source barrel is necessary. 
 
-The simplest way to ensure non-matching sequences is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$. For the Hamby data sets, we have separated the barrels into odd and even groups, and bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. Another option would be to use only one sequence from each barrel, but that dramatically reduces the number of chunks available for resampling, and potentially reduces the probability of seeing certain types of poor-quality data. 
+The simplest way to ensure non-matching sequences is to compare signatures sampled from a collection of barrels $G_1$ to signatures sampled from a collection of barrels $G_2$, where $G_1 \cap G2 = \emptyset$. This ensures that incidental matches from different signatures originating from the same land of the same barrel do not occur, because same-barrel comparisons are not possible under this sampling strategy. Any arrangement such that generated sequences $S^\ast_1$ and $S^\ast_2$ are do not contain chunks from the same barrel is permissible, however, it is much simpler to consider a sampling scheme where $S^\ast_1$ is generated from chunks originating from barrels in $G_1$ and $S^\ast_2$ is generated from chunks originating from barrels in $G_2$ than to consider the more general case. 
+
+## Generation of Known Match Sequences
+
+Generation of known match sequences is somewhat more complicated, in part because it is necessary to generate two separate sequences: the pattern which might be thought of as originating from the physical object (in this case, toolmarks on the lands of the barrel), which is consistent across sequences, and the variability around this pattern which reflects the differences in the firing process, any damage to the bullet, and any measurement error. To generate these two separate sequences, we must first have a set of co-aligned signatures from the same land of the same barrel. These sets of lands will be used to generate a set of consensus sequences which will be resampled to generate the structure corresponding to the physical object. Deviations from the consensus sequence will be resampled separately to produce individual signature differences from the consensus sequence. In both cases, resampling will take place using the general threshold bootstrap framework described in \autoref{threshold-bootstrap-alg}
 
 
 
