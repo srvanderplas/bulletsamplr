@@ -11,7 +11,7 @@ con <- dbConnect(odbc::odbc(), "bullets", timeout = 10)
 cs_lims <- tbl(con, "bullet.crosssection") %>%
   group_by(Study, Barrel, Bullet, Land, id, source) %>%
   mutate(isna = is.na(sig)) %>%
-  summarize(seq_xavg = mean(x), seq_len = n()) %>%
+  summarize(seq_xavg = mean(x, na.rm = T), seq_len = n()) %>%
   collect() %>%
   ungroup()
 
@@ -29,16 +29,14 @@ ggplot(peaks) +
 
 peak_lens <- peaks %>% group_by(Study, Barrel, Bullet, Land, id) %>%
   summarize(seq_len = unique(seq_len))
-tmp <- furrr::future_map(as.numeric(peak_lens$seq_len),
-                         crosscut_assemble, con = con)
 
-tmp <- rep(NA, 420) %>% as.list()
-for (i in 1:nrow(peak_lens)) {
-  print(i)
-  tmp[i] <- crosscut_assemble(peak_lens$seq_len[i], con = con)
-}
+crosscut_assemble(len = 3431, df = tbl(con, "bullet.slice"), df_summary = tbl(con, "bullet.slice.idx"), fill = F)
 
-resampled_sigs <- bind_rows(tmp)
+resampled_sigs <- furrr::future_map_dfr(.x = as.numeric(peak_lens$seq_len),
+                                        .f = crosscut_assemble,
+                                        .id = "sample",
+                                        df = tbl(con, "bullet.slice"),
+                                        df_summary = tbl(con, "bullet.slice.idx"))
 
 resampled_peaks <- resampled_sigs  %>%
   tidyr::nest(type, id, x, y, value, sig) %>%
