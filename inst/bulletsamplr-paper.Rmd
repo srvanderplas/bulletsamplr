@@ -598,9 +598,18 @@ The simplest way to ensure non-matching sequences is to compare signatures sampl
 
 ## Generation of Known Match Sequences
 
-Generation of known match sequences is somewhat more complicated, in part because it is necessary to generate two separate sequences: the pattern which might be thought of as originating from the physical object (in this case, toolmarks on the lands of the barrel), which is consistent across sequences, and the variability around this pattern which reflects the differences in the firing process, any damage to the bullet, and any measurement error. To generate these two separate sequences, we must first have a set of co-aligned signatures from the same land of the same barrel. These sets of lands will be used to generate a set of consensus sequences which will be resampled to generate the structure corresponding to the physical object. Deviations from the consensus sequence will be resampled separately to produce individual signature differences from the consensus sequence. In both cases, resampling will take place using the general threshold bootstrap framework described in \autoref{threshold-bootstrap-alg}
+Generation of known match sequences is somewhat more complicated, in part because it is necessary to generate two separate sequences: the pattern which might be thought of as originating from the physical object (in this case, toolmarks on the lands of the barrel), which is consistent across sequences, and the variability around this pattern which reflects the differences in the firing process, any damage to the bullet, and any measurement error. To generate these two separate sequences, we must first have a set of co-aligned signatures from the same land of the same barrel. These sets of lands will be used to generate a set of consensus sequences which will be resampled to generate the structure corresponding to the physical object. Deviations from the consensus sequence will be resampled separately to produce individual signature differences from the consensus sequence. In both cases, resampling will take place using the general threshold bootstrap framework described in \autoref{threshold-bootstrap-alg}. 
 
-
+```{r known-match-align, fig.cap = "Aligned signatures from Barrel 2 of the Hamby studies."}
+filter(barrel_align_plotable, Barrel == 2) %>%
+  mutate(LandSet = paste0("Aligned Land ", match(LandSet, letters), "*")) %>%
+  ggplot(aes(x = x, y = sig)) + 
+  geom_line(aes(color = interaction(set, Bullet))) +  
+  facet_wrap(~LandSet, nrow = 4) + 
+  scale_color_discrete(guide = F) + 
+  scale_y_continuous(expression(paste("Signature Height (", mu, "m)")), limits = c(-5, 5)) + 
+  scale_x_continuous("")
+```
 
 ## Consecutive Matching Striae and resampling
 
