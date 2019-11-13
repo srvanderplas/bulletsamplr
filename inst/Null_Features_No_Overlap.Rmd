@@ -123,6 +123,7 @@ ggplot(data = features, aes(x = ccf)) +
   ylab("Number of Sequences") + 
   ggtitle("Null Distribution of Cross Correlation")
 ```
+
 ### Rough Correlation
 
 ```{r}
@@ -132,6 +133,7 @@ ggplot(data = features, aes(x = rough_cor)) +
   ylab("Number of Sequences") + 
   ggtitle("Null Distribution of Rough Correlation")
 ```
+
 ### Sequence Distance
 
 ```{r}
@@ -141,6 +143,7 @@ ggplot(data = features, aes(x = D)) +
   ylab("Number of Sequences") + 
   ggtitle("Null Distribution of Sequence Distance")
 ```
+
 ### Standard Deviation of Sequence Distance
 
 ```{r}
