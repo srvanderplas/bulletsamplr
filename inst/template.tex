@@ -9,7 +9,7 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{multirow}
-\usepackage[table]{xcolor}
+\usepackage[table,dvipsnames]{xcolor}
 \usepackage{wrapfig}
 \usepackage{subfig}
 \usepackage{float}
@@ -18,6 +18,8 @@
 \usepackage{pdflscape}
 \usepackage{tabu}
 \usepackage{threeparttable}
+
+\usepackage{cleveref}
 
 \usepackage{url} % not crucial - just used below for the URL
 
@@ -45,10 +47,9 @@
 \providecommand{\tightlist}{%
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 % --- TODO ---------------------------------------------------------------------
-\usepackage[colorinlistoftodos]{todonotes}
-\newcommand{\comment}[2][inline]{\todo[color=SkyBlue, #1]{#2}}
-\newcommand{\newdo}[1]{\todo[inline, color=Lime]{#1}} % new to do item
-% \newcommand{\todo}[1]{\todo[inline, color=Orange]{#1}} % new to do item
+\newcommand{\svp}[1]{{\textcolor{Cerulean}{#1}}}
+\newcommand{\note}[1]{{\textcolor{WildStrawberry}{#1}}}
+\newcommand{\todo}[1]{{\textcolor{Emerald}{#1}}}
 % ------------------------------------------------------------------------------
 
 % --- Font specification -------------------------------------------------------
