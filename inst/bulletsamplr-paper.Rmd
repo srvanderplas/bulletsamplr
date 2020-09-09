@@ -15,7 +15,7 @@ keywords:
 
 abstract: abstract-text
   
-bibliography: refs.bib
+bibliography: bibfile.bib
 biblio-style: apsr
 
 output: 
@@ -35,6 +35,7 @@ knitr::opts_chunk$set(
   cache = T,
   comment = "#>",
   dpi = 300,
+  dev = "png",
   out.width = "\\textwidth",
   fig.width = 8, fig.height = 5,
   message = F, warning = F
@@ -255,7 +256,7 @@ plot_aligned_seq <- function(letter, long, med) {
       geom_line() + 
       geom_line(aes(x = x, y = med, color = NA), data = med) + 
       # facet_grid(fac~., labeller = label_both) +
-      scale_color_discrete(na.value = 'grey', guide = F) + 
+      scale_color_discrete(na.value = 'grey', guide = 'none') + 
       theme(axis.title = element_blank()) + 
       ggtitle(sprintf("Hamby Barrel %02s Bullets, Land Set %s", barrel, letter))
   })
@@ -361,7 +362,7 @@ It is much more reasonable to statistically derive the distribution of scores un
 
 ## Statistical Analysis of Bullet Land Engraved Areas
 
-Comparison of bullet land engraved areas (LEAs) typically involves distilling the 3D scan of the area of interest into a two-dimensional ``signature" that removes artifacts originating from the grooves as well as the curvature of the bullet. \citet{hare_automatic_2016} provides one method for distilling bullet scans into signatures; alternate methods used in \citet{vorburgerApplicationsCrosscorrelationFunctions2011} should also be compatible with the approach described in this paper. \todo{cite CMPS paper, Will's implementation} Important characteristics of the LEA signature depend in part on the method used to transform the collected 3D image into a signature. We would not expect that different filtering and noise removal methods would produce signatures with exactly the same shapes or properties. By working with comparisons at the signature level, rather than the full image level, we also do not have to simulate the entire 3D image, as in \citet{bachrach_development_2013}. 
+Comparison of bullet land engraved areas (LEAs) typically involves distilling the 3D scan of the area of interest into a two-dimensional ``signature" that removes artifacts originating from the grooves as well as the curvature of the bullet. \citet{aoas} provides one method for distilling bullet scans into signatures; alternate methods used in \citet{vorburgerApplicationsCrosscorrelationFunctions2011} should also be compatible with the approach described in this paper. \todo{cite CMPS paper, Will's implementation} Important characteristics of the LEA signature depend in part on the method used to transform the collected 3D image into a signature. We would not expect that different filtering and noise removal methods would produce signatures with exactly the same shapes or properties. By working with comparisons at the signature level, rather than the full image level, we also do not have to simulate the entire 3D image, as in \citet{bachrach_development_2013}. 
 
 It is important that the presence of problematic features, such as tank rash and missing values due to microscope error, occur with approximately the same frequency in the generated sequences as in sequences from real data. This ensures that the reference distributions for known matches and known non-matches account for real-world constraints. The method for synthetic signature generation proposed in \citet{bachrach_development_2013} produces sequences and 3D images which do not mimic the problems seen in collected data. Examples of problematic lands in the Hamby 44 test set are shown in \Cref{fig:tankrash}. To address this issue, this paper proposes a method for generating sequences from examiner test kits and persistence studies using resampling techniques designed for data with temporal or spatial autocorrelation. 
 
@@ -405,7 +406,7 @@ The threshold bootstrap was proposed by \citet{park_threshold_1999} as an altern
 
 \Cref{fig:threshold-bootstrap-cycle-demo} shows a bullet signature, with the signature median value marked; the bottom two images shows the blocks produced for use in the threshold bootstrap, where each block contains 1 or 3 cycles, respectively, as defined by \citet{park_threshold_1999} . 
 
-```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In the second graph, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data. The third graph shows the same signature, divided into chunks consisting of 3 cycles. The first and last chunks are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence. The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created using the \\texttt{bulletxtrctr} package and the method described in \\Cref{hare_automatic_2016}.", fig.height = 6, fig.width = 8, warning = F}
+```{r threshold-bootstrap-cycle-demo, fig.cap = "Threshold Bootstrap Cycle Construction. In the second graph, chunks are composed of a single cycle, but any multiple of $n$ cycles could be used, depending on the dependency structure in the data. The third graph shows the same signature, divided into chunks consisting of 3 cycles. The first and last chunks are boundary chunks, and do not contain a full cycle consisting of one region above the median and one region below the median. Boundary chunks are recycled to construct the ends of a bootstrapped sequence. The LEA signature shown is from Barrel 1, Bullet 1, Land 1 in the Hamby 252 data set downloaded from NIST Ballistics Toolmark Research Database \\citep{zheng_nist_2016}; the signature was created using the \\texttt{bulletxtrctr} package and the method described in \\citet{aoas}.", fig.height = 6, fig.width = 8, warning = F}
 theme_set(theme_bw())
 data(sig)
 threshold <- median(sig$sig, na.rm = T)
@@ -469,7 +470,7 @@ p3 <- ggplot(data = sig_slices, aes(x = xold, y = sigold, color = factor(.chunk)
             vjust = -0.1, data = sig_slices_sum, inherit.aes = F) +
   geom_hline(aes(yintercept = threshold), color = "grey40") + 
   geom_line() + 
-  scale_color_discrete("Chunk", guide = F) + 
+  scale_color_discrete("Chunk", guide = 'none') + 
   scale_y_continuous(expand = expansion(mult = .05, add = c(0, .5))) + 
   ggtitle("Chunks (and boundary regions), 1 cycle/chunk") + 
   theme(axis.title = element_blank(), axis.text.x = element_blank())
@@ -485,7 +486,7 @@ p4 <- ggplot(data = sig_slices2, aes(x = xold, y = sigold, color = factor(.chunk
             vjust = -0.1, data = sig_slices_sum2, inherit.aes = F) +
   geom_hline(aes(yintercept = threshold), color = "grey40") + 
   geom_line() + 
-  scale_color_discrete("Chunk", guide = F) + 
+  scale_color_discrete("Chunk", guide = 'none') + 
   scale_y_continuous(expand = expansion(mult = .05, add = c(0, .5))) + 
   ggtitle("Cycles (and boundary regions), 3 cycles/chunk") + 
   theme(axis.title = element_blank(), axis.text.x = element_blank())
@@ -502,7 +503,7 @@ This paper demonstrates the use of the threshold bootstrap to create simulated L
 
 The Hamby studies work well to demonstrate the threshold bootstrap because of their structure: each set consists of 35 bullets fired from 10 barrels. The study is a `closed set' study, which means that all unknown bullets were actually fired from the same barrels which produced the known bullets; that is, each unknown bullet does match a set of known bullets. In each Hamby set, there are 20 known bullets; 2 for each of the 10 barrels used in the study. There are also 15 unknown bullets which can be matched to one of the 10 barrels. 
 
-The input data are LEA signatures taken from three Hamby studies (36, 44, 224). The bullets were scanned using a Sensofar Sneox1 confocal microscope at 20x resolution. The scans were processed using the `bulletxtrctr` package \citep{bulletxtrctr} with default smoothing parameters; grooves were adjusted manually after automatic identification. The `bulletxtrctr` package provides an open-source implementation of the algorithm described in \citet{hare_automatic_2016}. 
+The input data are LEA signatures taken from three Hamby studies (36, 44, 224). The bullets were scanned using a Sensofar Sneox1 confocal microscope at 20x resolution. The scans were processed using the `bulletxtrctr` package \citep{bulletxtrctr} with default smoothing parameters; grooves were adjusted manually after automatic identification. The `bulletxtrctr` package provides an open-source implementation of the algorithm described in \citet{aoas}. 
 
 With the Hamby data sets, we have separated the barrels into two groups consisting of odd and even-numbered barrels respectively. Bootstrap sequences are assembled from segments of signatures in one group and compared to sequences assembled from segments of signatures in another. 
 
@@ -564,7 +565,7 @@ ggplot() +
   facet_grid(.~phase) + 
   scale_x_continuous("Sequence 2", breaks = 1:6) + scale_y_continuous("Sequence 1", breaks = 1:6) + 
   # theme(axis.title = element_blank()) + 
-  scale_fill_gradient2(guide = F, low = "blue", high = "red", mid = "white", limits = c(-500, 500)) + 
+  scale_fill_gradient2(guide = 'none', low = "blue", high = "red", mid = "white", limits = c(-500, 500)) + 
   coord_fixed() + 
   ggtitle("Alignment phases between two bullets")
 
@@ -636,7 +637,7 @@ ggplot(data = hb2, aes(x = x, y = sig)) +
   geom_line(aes(color = interaction(set, Bullet)), data = hb2) +  
   geom_line(data = hb2m) +  
   facet_wrap(~LandSet, nrow = 4) + 
-  scale_color_discrete(guide = F) + 
+  scale_color_discrete(guide = 'none') + 
   scale_y_continuous(expression(paste("Signature Height (", mu, "m)")), limits = c(-5, 5)) + 
   scale_x_continuous("") + 
   ggtitle("Hamby Barrel 2 Consensus Sequences")
