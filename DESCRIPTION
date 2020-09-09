@@ -26,7 +26,8 @@ Suggests:
     ggplot2,
     stringr,
     knitr
-Imports:
+Imports:    
+    tibble,
     bulletxtrctr,
     dplyr,
     assertthat,
@@ -34,8 +35,7 @@ Imports:
     Rcpp
 Remotes:
     heike/bulletxtrctr,
-    heike/x3ptools,
-    klutometis/roxygen
+    heike/x3ptools
 Depends:
     R (>= 2.10)
 RoxygenNote: 6.1.0.9000

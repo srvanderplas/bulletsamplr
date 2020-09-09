@@ -59,7 +59,7 @@ df_fix_length <- function(full_df, len) {
     padna <- len - nrow(full_df)
     pad_front <- sample(1:padna, 1)
     pad_back <- padna - pad_front
-    blank_row <- dplyr::data_frame(type = "fill")
+    blank_row <- tibble::tibble(type = "fill")
     return(
       dplyr::bind_rows(lapply(1:pad_front, function(i) blank_row),
                        full_df, lapply(1:pad_back, function(i) blank_row))

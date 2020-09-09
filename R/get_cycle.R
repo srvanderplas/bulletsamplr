@@ -51,7 +51,7 @@ crosscut_slice <- function(x, ncycle = 1) {
     p2n
   }
 
-  sig_idx <- data_frame(
+  sig_idx <- tibble::tibble(
     map_cycle = 0:length(idx),
     map_start = c(1, idx),
     map_end = c(idx - 1, length(sig)),
@@ -73,7 +73,7 @@ chunk_slice <- function(sig, map_chunk, map_start, map_end, map_type) {
   z <- if (is.data.frame(sig)) {
     sig[map_start:map_end,]
   } else {
-    data_frame(
+    tibble::tibble(
       x = map_start:map_end,
       sig = sig[map_start:map_end]
     )
