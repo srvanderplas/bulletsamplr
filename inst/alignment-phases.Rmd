@@ -1,0 +1,31 @@
+---
+title: "Untitled"
+author: "Susan Vanderplas"
+date: "2/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<!-- ### Alignment Phases -->
+
+<!-- For any two sets of signatures $\{S_{\cdot j_1\cdot}\}$ and $\{S_{\cdot j_2 \cdot}\}$ from the same barrel, there are $K_i$ possible arrangements of the sequences which maintain the physical ordering of lands on the bullet.  -->
+<!-- A graphical representation of these arrangements for a barrel with 6 lands is shown in \Cref{fig:align}. -->
+
+<!-- For notational convenience, we will enforce an index of $k$ across the $N_i$ bullets from each barrel such that all bullets are in alignment phase $A$, that is, $S_{i j_1 k}$ and $S_{i j_2 k}$ must be sequences corresponding to the same land of barrel $i$.  -->
+<!-- This is still a non-unique indexing system, as there are $K_i$ such arrangements.  -->
+
+<!-- \todo{this still needs some work} -->
+<!-- This constraint may require re-indexing each bullet $j = 2, ..., N_i$ relative to the first ($j=1$) such that the scanned land numbers $z = z_1, ..., Z_{K_i}$ are mapped to the $k = 1, ..., K_i$ such that $k = (z + \alpha_j) \mod K_i + 1$ for some $\alpha_j$ describing the phase alignment between the scan of bullet $j$ and the scan of the first bullet.   -->
+
+
+<!-- Without loss of generality, fix the order of $\{S_{\cdot j_1k}\}_{k=1, ..., K_i}$ and manipulate only $\{S_{\cdot j_2k}\}_{k=1, ..., K_i}$. For each of the $K_i$ possibilities, we can define the phase of a bullet alignment to be $P_{j_1, j_2} = A, B, C, ...$, where each letter represents one of the $K_i$ possible alignments.  -->
+<!-- Typically lands are numbered during the scanning process, and these numbers depend on the land scanned first - only the relative ordering matters; thus, to avoid confusion between land numbers and phases, letters are used to denote phase values.  -->
+<!-- For notational convenience, we can (re)define the index $k=1, ..., K_i$ for each set of bullets $S_{ij}$ such that on any two bullets $j_1$ and $j_2$ from the same barrel, $S_{\cdot j_1 k}$ and $S_{\cdot j_2 k}$ correspond to matching lands.  -->
+<!-- Visually, this corresonds to \Cref{fig:align} -->
+<!-- There are $K_i$ such alignments, because the order of the index $k$ is the only relevant information (the actual value of $k$ does not matter), but it will be much easier to keep track of the sequences if we enforce this notational constraint.  -->
+
+
